@@ -254,6 +254,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/clientes',
+      name: 'Clientes',
+      component: () => import('../views/Clientes/ClientesView.vue'),
+      meta: {
+        title: 'Clientes',
+      },
+    },
+    {
       path: '/signin',
       name: 'Signin',
       component: () => import('../views/Auth/Signin.vue'),
