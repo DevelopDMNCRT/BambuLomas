@@ -246,6 +246,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/ordenes',
+      name: 'Ordenes',
+      component: () => import('../views/Ordenes/OrdenesView.vue'),
+      meta: {
+        title: 'Órdenes del Cliente',
+      },
+    },
+    {
       path: '/signin',
       name: 'Signin',
       component: () => import('../views/Auth/Signin.vue'),

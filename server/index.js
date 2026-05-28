@@ -31,6 +31,35 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
+// Crear tabla de ordenes si no existe
+const createOrdenesTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ordenes (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        numero_pedido VARCHAR(50) NOT NULL,
+        cliente_nombre VARCHAR(255) NOT NULL,
+        cliente_telefono VARCHAR(50),
+        cliente_email VARCHAR(255),
+        cliente_direccion TEXT,
+        cliente_referencias TEXT,
+        pago_metodo VARCHAR(50) DEFAULT 'Efectivo',
+        tipo_entrega VARCHAR(50) DEFAULT 'domicilio',
+        total NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        costo_envio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Nuevo',
+        productos JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT now(),
+        edited_at TIMESTAMP
+      );
+    `);
+    console.log("✅ Tabla 'ordenes' verificada en la base de datos.");
+  } catch (err) {
+    console.error("❌ Error al crear la tabla 'ordenes':", err);
+  }
+};
+createOrdenesTable();
+
 // ── UPLOAD DE IMAGENES ────────────────────────────────────
 
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -1575,6 +1604,126 @@ app.delete('/api/platillos/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar platillo' });
+  }
+});
+
+// ── ORDENES KANBAN ────────────────────────────────────────
+
+// GET /api/ordenes — Obtiene las órdenes activas para el tablero Kanban
+app.get('/api/ordenes', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, numero_pedido as "numeroPedido", cliente_nombre as "clienteNombre", 
+              cliente_telefono as "clienteTelefono", cliente_email as "clienteEmail", 
+              cliente_direccion as "clienteDireccion", cliente_referencias as "clienteReferencias", 
+              pago_metodo as "pagoMetodo", tipo_entrega as "tipoEntrega", 
+              total, costo_envio as "costoEnvio", estado, productos,
+              TO_CHAR(created_at, 'HH24:MI') as "horaCreada",
+              created_at as "createdAt"
+       FROM ordenes
+       WHERE estado IN ('Nuevo', 'En preparación', 'En entrega')
+       ORDER BY id ASC`
+    );
+    
+    const formatted = rows.map(r => ({
+      ...r,
+      total: parseFloat(r.total),
+      costoEnvio: parseFloat(r.costoEnvio),
+      productos: typeof r.productos === 'string' ? JSON.parse(r.productos) : r.productos
+    }));
+    
+    res.json(formatted);
+  } catch (err) {
+    console.error('Error al obtener órdenes:', err);
+    res.status(500).json({ error: 'Error al obtener órdenes' });
+  }
+});
+
+// POST /api/ordenes — Crea una nueva orden desde el cliente
+app.post('/api/ordenes', async (req, res) => {
+  const { 
+    clienteNombre, clienteTelefono, clienteEmail, 
+    clienteDireccion, clienteReferencias, pagoMetodo, 
+    tipoEntrega, total, costoEnvio, productos 
+  } = req.body;
+
+  if (!clienteNombre || !clienteTelefono || !productos || !Array.isArray(productos)) {
+    return res.status(400).json({ error: 'Campos obligatorios faltantes (clienteNombre, clienteTelefono, productos)' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const nextPedQuery = `
+      INSERT INTO ordenes 
+        (numero_pedido, cliente_nombre, cliente_telefono, cliente_email, 
+         cliente_direccion, cliente_referencias, pago_metodo, tipo_entrega, 
+         total, costo_envio, estado, productos)
+      VALUES 
+        (
+          '#' || (COALESCE((SELECT max(id) FROM ordenes), 0) + 2500 + 1),
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, 'Nuevo', $10
+        )
+      RETURNING 
+        id, numero_pedido as "numeroPedido", cliente_nombre as "clienteNombre", 
+        cliente_telefono as "clienteTelefono", cliente_email as "clienteEmail", 
+        cliente_direccion as "clienteDireccion", cliente_referencias as "clienteReferencias", 
+        pago_metodo as "pagoMetodo", tipo_entrega as "tipoEntrega", 
+        total, costo_envio as "costoEnvio", estado, productos, 
+        TO_CHAR(created_at, 'HH24:MI') as "horaCreada"
+    `;
+
+    const { rows } = await client.query(nextPedQuery, [
+      clienteNombre,
+      clienteTelefono,
+      clienteEmail || null,
+      clienteDireccion || null,
+      clienteReferencias || null,
+      pagoMetodo || 'Efectivo',
+      tipoEntrega || 'domicilio',
+      total || 0,
+      costoEnvio || 0,
+      JSON.stringify(productos)
+    ]);
+
+    await client.query('COMMIT');
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error al crear orden:', err);
+    res.status(500).json({ error: 'Error al crear orden' });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /api/ordenes/:id/status — Actualiza el estado de la orden
+app.put('/api/ordenes/:id/status', async (req, res) => {
+  const { estado } = req.body;
+  const { id } = req.params;
+
+  if (!estado) {
+    return res.status(400).json({ error: 'El estado es obligatorio' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE ordenes
+       SET estado = $1, edited_at = now()
+       WHERE id = $2
+       RETURNING id, estado`,
+      [estado, id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Orden no encontrada' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error al actualizar estado de la orden:', err);
+    res.status(500).json({ error: 'Error al actualizar estado de la orden' });
   }
 });
 

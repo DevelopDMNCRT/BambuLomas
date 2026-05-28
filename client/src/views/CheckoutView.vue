@@ -152,11 +152,11 @@
 
             <button 
               @click="handleSubmit"
-              :disabled="!isFormValid"
+              :disabled="!isFormValid || isSubmitting"
               :class="['mt-6 w-full py-4 rounded-2xl font-black text-[15px] flex items-center justify-between px-5 transition-all',
-                isFormValid ? 'bg-[#4F817D] hover:bg-[#2D5A5A] text-white shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed']"
+                (isFormValid && !isSubmitting) ? 'bg-[#4F817D] hover:bg-[#2D5A5A] text-white shadow-lg' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed']"
             >
-              <span>Confirmar Pedido</span>
+              <span>{{ isSubmitting ? 'Procesando...' : 'Confirmar Pedido' }}</span>
               <span class="bg-white/20 px-3 py-1 rounded-lg text-sm font-black">${{ totalFinal.toFixed(2) }}</span>
             </button>
           </div>
@@ -173,7 +173,7 @@
         <svg class="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
       </div>
       <h2 class="text-2xl font-black text-gray-900 dark:text-white mb-2">¡Pedido Enviado!</h2>
-      <p class="text-gray-500 dark:text-gray-400 mb-6">Gracias <strong>{{ form.nombre }}</strong>, pronto nos comunicaremos contigo para confirmar tu pedido.</p>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Gracias <strong>{{ form.nombre }}</strong> por tu compra, tu pedido ya está siendo preparado.</p>
       <button @click="goHome" class="w-full py-3 bg-[#4F817D] hover:bg-[#2D5A5A] text-white rounded-2xl font-black transition-colors">
         Ir al Inicio
       </button>
@@ -228,9 +228,55 @@ const getVariantsLabel = (item: any): string => {
   return parts.join(' · ')
 }
 
-const handleSubmit = () => {
-  if (!isFormValid.value) return
-  showSuccess.value = true
+const isSubmitting = ref(false)
+
+const handleSubmit = async () => {
+  if (!isFormValid.value || isSubmitting.value) return
+  isSubmitting.value = true
+  
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    const orderData = {
+      clienteNombre: form.value.nombre,
+      clienteTelefono: form.value.telefono,
+      clienteEmail: form.value.email || '',
+      clienteDireccion: deliveryMode.value === 'domicilio' ? form.value.direccion : 'Recoger en local',
+      clienteReferencias: deliveryMode.value === 'domicilio' ? form.value.referencias : '',
+      pagoMetodo: form.value.pago,
+      tipoEntrega: deliveryMode.value,
+      total: totalFinal.value,
+      costoEnvio: shippingCost.value,
+      productos: cartItems.value.map(item => ({
+        id: item.id,
+        nombre: item.nombre,
+        cantidad: item.cantidad,
+        precio: item.precio,
+        imagenUrl: item.imagenUrl || '',
+        selectedVariants: item.selectedVariants || null,
+        variantsLabel: getVariantsLabel(item)
+      }))
+    }
+    
+    const res = await fetch(`${apiUrl}/api/ordenes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderData)
+    })
+    
+    if (res.ok) {
+      showSuccess.value = true
+    } else {
+      const errData = await res.json()
+      alert(`Error al procesar el pedido: ${errData.error || 'Intente más tarde'}`)
+    }
+  } catch (error) {
+    console.error('Error enviando pedido:', error)
+    alert('Hubo un problema de conexión. Por favor intente de nuevo.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const goHome = () => {
