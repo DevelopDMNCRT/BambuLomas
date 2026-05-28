@@ -67,7 +67,7 @@
                   </label>
                   <div class="flex">
                     <span class="px-3 py-3 bg-gray-100 dark:bg-gray-800 border border-r-0 border-gray-200 dark:border-gray-700 rounded-l-xl text-sm text-gray-500 dark:text-gray-400">🇲🇽 +52</span>
-                    <input v-model="form.telefono" type="tel" placeholder="55 1234 5678" class="flex-1 px-4 py-3 rounded-r-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
+                    <input v-model="form.telefono" type="tel" maxlength="10" placeholder="55 1234 5678" class="flex-1 px-4 py-3 rounded-r-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
                   </div>
                 </div>
                 <div>
@@ -182,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Header from '../components/Header.vue'
 import { cartItems, cartTotal, clearCart } from '../store/cart'
@@ -201,6 +201,11 @@ const form = ref({
   pago: 'Efectivo'
 })
 
+// Limpiar teléfono para aceptar solo dígitos y máximo 10 caracteres
+watch(() => form.value.telefono, (newVal) => {
+  form.value.telefono = newVal.replace(/\D/g, '').slice(0, 10)
+})
+
 const paymentMethods = [
   { id: 'Efectivo', label: 'Efectivo', icon: '💵' },
   { id: 'Tarjeta', label: 'Tarjeta', icon: '💳' },
@@ -210,8 +215,13 @@ const paymentMethods = [
 const shippingCost = computed(() => deliveryMode.value === 'domicilio' ? SHIPPING_COST : 0)
 const totalFinal = computed(() => cartTotal.value + shippingCost.value)
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 const isFormValid = computed(() => {
-  const base = form.value.nombre.trim() && form.value.telefono.trim()
+  const isPhoneValid = form.value.telefono.trim().length === 10
+  const isEmailValid = emailRegex.test(form.value.email.trim())
+  const base = form.value.nombre.trim() && isPhoneValid && isEmailValid
+  
   if (deliveryMode.value === 'domicilio') {
     return !!base && !!form.value.direccion.trim() && cartItems.value.length > 0
   }
