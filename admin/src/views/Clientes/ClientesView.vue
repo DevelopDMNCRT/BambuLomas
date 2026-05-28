@@ -118,9 +118,6 @@
                       ]"
                     ></span>
                     {{ cliente.cuenta.estado }}
-                    <template v-if="cliente.cuenta.estado === 'Abierta' && cliente.cuenta.monto">
-                      - ${{ cliente.cuenta.monto.toFixed(2) }}
-                    </template>
                   </span>
                 </td>
 
@@ -178,8 +175,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '5510108014',
     cuenta: { estado: 'Abierta', monto: 556.00 },
     pedidos: 15,
-    platilloFavorito: 'Combo Bambú del Día',
-    ultimoPedido: 'Hoy, 09:00'
+    platilloFavorito: 'Molletes Gourmet',
+    ultimoPedido: '28/05/2026 09:00'
   },
   {
     id: 2,
@@ -187,8 +184,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '3312345678',
     cuenta: { estado: 'Cerrada' },
     pedidos: 8,
-    platilloFavorito: 'Taco de Asada',
-    ultimoPedido: 'Ayer, 18:30'
+    platilloFavorito: 'Tacos',
+    ultimoPedido: '27/05/2026 18:30'
   },
   {
     id: 3,
@@ -196,8 +193,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '5587654321',
     cuenta: { estado: 'Abierta', monto: 320.00 },
     pedidos: 24,
-    platilloFavorito: 'Chilaquiles Verdes',
-    ultimoPedido: 'Hoy, 08:15'
+    platilloFavorito: 'Molletes Gourmet',
+    ultimoPedido: '28/05/2026 08:15'
   },
   {
     id: 4,
@@ -205,8 +202,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '5543210987',
     cuenta: { estado: 'Cerrada' },
     pedidos: 5,
-    platilloFavorito: 'Ensalada César',
-    ultimoPedido: 'Hace 3 días'
+    platilloFavorito: 'Coca',
+    ultimoPedido: '25/05/2026 14:20'
   },
   {
     id: 5,
@@ -214,8 +211,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '3398765432',
     cuenta: { estado: 'Cerrada' },
     pedidos: 12,
-    platilloFavorito: 'Sopa de Elote',
-    ultimoPedido: 'Hace 1 semana'
+    platilloFavorito: 'Molletes Gourmet',
+    ultimoPedido: '21/05/2026 11:45'
   },
   {
     id: 6,
@@ -223,8 +220,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '5598761234',
     cuenta: { estado: 'Abierta', monto: 185.50 },
     pedidos: 30,
-    platilloFavorito: 'Pechugas Cordón Bleu',
-    ultimoPedido: 'Hoy, 09:12'
+    platilloFavorito: 'Tacos',
+    ultimoPedido: '28/05/2026 09:12'
   },
   {
     id: 7,
@@ -232,8 +229,8 @@ const clientesMock = ref<Cliente[]>([
     telefono: '3387654321',
     cuenta: { estado: 'Cerrada' },
     pedidos: 2,
-    platilloFavorito: 'Platanos con Crema',
-    ultimoPedido: 'Hace 2 semanas'
+    platilloFavorito: 'Latte',
+    ultimoPedido: '14/05/2026 16:30'
   }
 ])
 
