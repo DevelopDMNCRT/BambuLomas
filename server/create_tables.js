@@ -147,6 +147,28 @@ async function main() {
     `);
     console.log("✅ Índice en 'product_aliases.normalized_description' verificado.");
 
+    // ── TABLA DE ORDENES (KANBAN) ──────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ordenes (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        numero_pedido VARCHAR(50) NOT NULL,
+        cliente_nombre VARCHAR(255) NOT NULL,
+        cliente_telefono VARCHAR(50),
+        cliente_email VARCHAR(255),
+        cliente_direccion TEXT,
+        cliente_referencias TEXT,
+        pago_metodo VARCHAR(50) DEFAULT 'Efectivo',
+        tipo_entrega VARCHAR(50) DEFAULT 'domicilio',
+        total NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        costo_envio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Nuevo',
+        productos JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT now(),
+        edited_at TIMESTAMP
+      );
+    `);
+    console.log("✅ Tabla 'ordenes' (Kanban) verificada.");
+
     // ── COLUMNAS FK (para bases existentes sin ellas) ──────────
 
     // Agregar product_id a compras_detalles si no existe
