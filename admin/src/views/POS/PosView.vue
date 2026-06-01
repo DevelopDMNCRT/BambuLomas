@@ -250,7 +250,7 @@
             <!-- Cliente CXC (Conditional) -->
             <div v-if="paymentData.method === 'cxc' && !cxcClientName" class="animate-modal-in">
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Cliente (Deudor)</label>
-              <input v-model="paymentData.clientName" @input="paymentData.clientName = $event.target.value.toUpperCase()" type="text" placeholder="Ej. JUAN PÉREZ" class="w-full mt-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all uppercase">
+              <input v-model="paymentData.clientName" @input="paymentData.clientName = ($event.target as HTMLInputElement).value.toUpperCase()" type="text" placeholder="Ej. JUAN PÉREZ" class="w-full mt-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all uppercase">
             </div>
           </div>
 
@@ -766,7 +766,7 @@ const processPayment = async () => {
           total: subtotal.value * 1.16,
           costoEnvio: 0,
           estado: 'Completada',
-          usuarioCobro: getUser()?.nombre || getUser()?.username || 'Desconocido',
+          usuarioCobro: getUser()?.nombre || (getUser() as any)?.usuario || 'Desconocido',
           productos: cart.value.map(c => ({
             id: c.platillo.id,
             producto: c.platillo.nombre,

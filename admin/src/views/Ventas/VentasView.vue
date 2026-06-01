@@ -142,7 +142,7 @@ const todayStr = new Date(new Date().getTime() - (new Date().getTimezoneOffset()
 const dateRange = ref(todayStr); 
 
 const flatPickrConfig = ref({
-  mode: 'range',
+  mode: 'range' as const,
   dateFormat: 'Y-m-d',
   maxDate: 'today',
   showMonths: window.innerWidth > 768 ? 2 : 1, // Show 2 months on larger screens
