@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Performance optimizations ── */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  /* Enable GPU compositing for the whole page */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
+}
+
+/* Composited transitions: only animate transform & opacity (no layout reflow) */
+.transition-colors {
+  transition-property: color, background-color, border-color, fill, stroke;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Promote animated/hover elements to their own GPU layer */
+.group:hover,
+[class*="hover:"] {
+  will-change: auto;
+}
+
+/* Product cards: contain paint to avoid triggering parent repaints */
+.product-card {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+/* Sidebars/Modals: composite layer prevents main thread jank */
+.modal-layer {
+  contain: layout style;
+  will-change: opacity, transform;
+}
+
+/* Backdrop blur: force GPU layer to avoid software compositing */
+[class*="backdrop-blur"] {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  will-change: transform;
+}
+
+/* Reduce animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Hide scrollbar for Category Scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
