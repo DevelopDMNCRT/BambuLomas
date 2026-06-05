@@ -163,6 +163,8 @@ async function main() {
         costo_envio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
         estado VARCHAR(50) NOT NULL DEFAULT 'Nuevo',
         productos JSONB NOT NULL DEFAULT '[]'::jsonb,
+        hora_entrega VARCHAR(50),
+        notas_pedido TEXT,
         created_at TIMESTAMP DEFAULT now(),
         edited_at TIMESTAMP
       );
@@ -184,6 +186,14 @@ async function main() {
       ADD COLUMN IF NOT EXISTS usuario_cobro VARCHAR(100);
     `);
     console.log("✅ Columna 'usuario_cobro' en 'ordenes' verificada.");
+
+    // Agregar hora_entrega y notas_pedido a ordenes si no existen
+    await pool.query(`
+      ALTER TABLE ordenes
+      ADD COLUMN IF NOT EXISTS hora_entrega VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS notas_pedido TEXT;
+    `);
+    console.log("✅ Columnas 'hora_entrega' y 'notas_pedido' en 'ordenes' verificadas.");
 
     // Agregar product_id a recetas_detalles si no existe
     await pool.query(`

@@ -68,8 +68,8 @@
                 </svg>
                 <span class="font-bold tabular-nums">{{ orden.horaCreada }}</span>
                 <span class="mx-1">•</span>
-                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {{ orden.tipoEntrega === 'domicilio' ? 'Envío' : 'Recoger' }}
+                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
+                  {{ orden.tipoEntrega === 'domicilio' ? (orden.clienteDireccion || 'Envío') : 'Recoger' }}
                 </span>
               </div>
 
@@ -137,8 +137,8 @@
                 </svg>
                 <span class="font-bold tabular-nums">{{ orden.horaCreada }}</span>
                 <span class="mx-1">•</span>
-                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {{ orden.tipoEntrega === 'domicilio' ? 'Envío' : 'Recoger' }}
+                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
+                  {{ orden.tipoEntrega === 'domicilio' ? (orden.clienteDireccion || 'Envío') : 'Recoger' }}
                 </span>
               </div>
 
@@ -210,8 +210,8 @@
                 </svg>
                 <span class="font-bold tabular-nums">{{ orden.horaCreada }}</span>
                 <span class="mx-1">•</span>
-                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {{ orden.tipoEntrega === 'domicilio' ? 'Envío' : 'Recoger' }}
+                <span class="capitalize text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 max-w-[120px] truncate">
+                  {{ orden.tipoEntrega === 'domicilio' ? (orden.clienteDireccion || 'Envío') : 'Recoger' }}
                 </span>
               </div>
 

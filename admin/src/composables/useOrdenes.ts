@@ -22,6 +22,8 @@ export interface Orden {
   tipoEntrega: string
   total: number
   costoEnvio: number
+  horaEntrega?: string
+  notasPedido?: string
   estado: 'Nuevo' | 'En preparación' | 'En entrega' | 'Completada' | 'Cancelada'
   productos: ProductoOrden[]
   horaCreada: string

@@ -1612,18 +1612,22 @@ app.delete('/api/platillos/:id', async (req, res) => {
 // GET /api/ordenes — Obtiene las órdenes activas para el tablero Kanban
 app.get('/api/ordenes', async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, numero_pedido as "numeroPedido", cliente_nombre as "clienteNombre", 
-              cliente_telefono as "clienteTelefono", cliente_email as "clienteEmail", 
-              cliente_direccion as "clienteDireccion", cliente_referencias as "clienteReferencias", 
-              pago_metodo as "pagoMetodo", tipo_entrega as "tipoEntrega", 
-              total, costo_envio as "costoEnvio", estado, productos,
-              TO_CHAR(created_at, 'HH24:MI') as "horaCreada",
-              created_at as "createdAt"
-       FROM ordenes
-       WHERE estado IN ('Nuevo', 'En preparación', 'En entrega')
-       ORDER BY id ASC`
-    );
+    const query = `
+      SELECT 
+        id, numero_pedido as "numeroPedido", cliente_nombre as "clienteNombre", 
+        cliente_telefono as "clienteTelefono", cliente_email as "clienteEmail", 
+        cliente_direccion as "clienteDireccion", cliente_referencias as "clienteReferencias", 
+        pago_metodo as "pagoMetodo", tipo_entrega as "tipoEntrega", 
+        total, costo_envio as "costoEnvio", estado, productos, 
+        usuario_cobro as "usuarioCobro",
+        hora_entrega as "horaEntrega", notas_pedido as "notasPedido",
+        TO_CHAR(created_at, 'HH24:MI') as "horaCreada",
+        created_at as "createdAt"
+      FROM ordenes 
+      WHERE estado IN ('Nuevo', 'En preparación', 'En entrega') 
+      ORDER BY id ASC
+    `;
+    const { rows } = await pool.query(query);
     
     const formatted = rows.map(r => ({
       ...r,
@@ -1644,7 +1648,8 @@ app.post('/api/ordenes', async (req, res) => {
   const { 
     clienteNombre, clienteTelefono, clienteEmail, 
     clienteDireccion, clienteReferencias, pagoMetodo, 
-    tipoEntrega, total, costoEnvio, productos, usuarioCobro 
+    tipoEntrega, total, costoEnvio, productos, usuarioCobro,
+    horaEntrega, notasPedido 
   } = req.body;
 
   if (!clienteNombre || !clienteTelefono || !productos || !Array.isArray(productos)) {
@@ -1659,11 +1664,11 @@ app.post('/api/ordenes', async (req, res) => {
       INSERT INTO ordenes 
         (numero_pedido, cliente_nombre, cliente_telefono, cliente_email, 
          cliente_direccion, cliente_referencias, pago_metodo, tipo_entrega, 
-         total, costo_envio, estado, productos, usuario_cobro)
+         total, costo_envio, estado, productos, usuario_cobro, hora_entrega, notas_pedido)
       VALUES 
         (
           '#' || (COALESCE((SELECT max(id) FROM ordenes), 0) + 2500 + 1),
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $10, $12
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $10, $12, $13, $14
         )
       RETURNING 
         id, numero_pedido as "numeroPedido", cliente_nombre as "clienteNombre", 
@@ -1671,6 +1676,7 @@ app.post('/api/ordenes', async (req, res) => {
         cliente_direccion as "clienteDireccion", cliente_referencias as "clienteReferencias", 
         pago_metodo as "pagoMetodo", tipo_entrega as "tipoEntrega", 
         total, costo_envio as "costoEnvio", estado, productos, 
+        hora_entrega as "horaEntrega", notas_pedido as "notasPedido",
         TO_CHAR(created_at, 'HH24:MI') as "horaCreada"
     `;
 
@@ -1686,7 +1692,9 @@ app.post('/api/ordenes', async (req, res) => {
       costoEnvio || 0,
       JSON.stringify(productos),
       req.body.estado || 'Nuevo',
-      usuarioCobro || null
+      usuarioCobro || null,
+      horaEntrega || null,
+      notasPedido || null
     ]);
 
     await client.query('COMMIT');

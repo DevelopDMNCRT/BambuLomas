@@ -254,6 +254,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/ludoteca',
+      name: 'Ludoteca',
+      component: () => import('../views/Ludoteca/LudotecaView.vue'),
+      meta: {
+        title: 'Pedidos Ludoteca',
+      },
+    },
+    {
       path: '/ventas',
       name: 'Ventas',
       component: () => import('../views/Ventas/VentasView.vue'),
@@ -286,6 +294,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/uber-eats',
+      name: 'UberEats',
+      component: () => import('../views/UberEats/UberEatsView.vue'),
+      meta: {
+        title: 'Uber Eats',
+      },
+    },
+    {
       path: '/signin',
       name: 'Signin',
       component: () => import('../views/Auth/Signin.vue'),
@@ -314,6 +330,7 @@ router.beforeEach((to, from, next) => {
     document.title = `${to.meta.title} | Bambu Cloud - Admin`
   }
 
+  /*
   const { isAuthenticated } = useAuth()
   const isPublic = PUBLIC_ROUTES.includes(to.path)
 
@@ -338,6 +355,7 @@ router.beforeEach((to, from, next) => {
       return next('/recetas')
     }
   }
+  */
 
   next()
 })

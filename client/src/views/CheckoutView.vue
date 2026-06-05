@@ -87,10 +87,49 @@
               <svg class="w-5 h-5 text-[#4F817D]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               Datos de Entrega
             </h3>
-            <div class="space-y-4">
-              <textarea v-model="form.direccion" rows="2" placeholder="Dirección completa (Calle, número, colonia)" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors resize-none"></textarea>
-              <input v-model="form.referencias" type="text" placeholder="Referencias (ej. portón azul, entre calles...)" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
+            <div class="space-y-5">
+              <!-- Hora Deseada -->
+              <div>
+                <label class="text-sm font-bold text-[#4F817D] mb-1.5 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Hora Deseada
+                </label>
+                <input v-model="form.horaEntrega" type="time" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
+              </div>
+
+              <!-- Lugar de Entrega (Píldoras) -->
+              <div>
+                <label class="text-sm font-bold text-[#4F817D] mb-2 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                  Lugar de Entrega
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="lugar in lugaresDeEntrega"
+                    :key="lugar"
+                    @click="form.lugarEntrega = lugar"
+                    :class="['px-4 py-2 rounded-full text-sm font-bold border transition-all',
+                      form.lugarEntrega === lugar ? 'border-[#4F817D] bg-[#4F817D] text-white shadow-md' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-[#4F817D]/50']"
+                  >
+                    {{ lugar }}
+                  </button>
+                </div>
+                
+                <!-- Input extra si selecciona "Otro" -->
+                <div v-if="form.lugarEntrega === 'Otro (Especificar)'" class="mt-3">
+                  <input v-model="form.otroLugar" type="text" placeholder="Especifique el lugar de entrega..." class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Notas del Pedido -->
+          <div class="bg-white dark:bg-gray-800 rounded-[20px] p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+            <h3 class="font-bold text-gray-900 dark:text-white text-lg mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-[#4F817D]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Notas del Pedido
+            </h3>
+            <textarea v-model="form.notasPedido" rows="3" placeholder="Notas generales (agregar extra servilletas, etc.)" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors resize-none"></textarea>
           </div>
 
           <!-- Payment Method -->
@@ -196,10 +235,17 @@ const form = ref({
   nombre: '',
   telefono: '',
   email: '',
-  direccion: '',
-  referencias: '',
+  horaEntrega: '',
+  lugarEntrega: '',
+  otroLugar: '',
+  notasPedido: '',
   pago: 'Efectivo'
 })
+
+const lugaresDeEntrega = [
+  'Barra', 'Ludoteca', 'Torniquetes Telcel', 'Royal Canin', 
+  'Carso Infraestructura', 'Torniquetes City Market', 'Otro (Especificar)'
+]
 
 // Limpiar teléfono para aceptar solo dígitos y máximo 10 caracteres
 watch(() => form.value.telefono, (newVal) => {
@@ -223,7 +269,8 @@ const isFormValid = computed(() => {
   const base = form.value.nombre.trim() && isPhoneValid && isEmailValid
   
   if (deliveryMode.value === 'domicilio') {
-    return !!base && !!form.value.direccion.trim() && cartItems.value.length > 0
+    const isLugarValid = form.value.lugarEntrega && (form.value.lugarEntrega !== 'Otro (Especificar)' || form.value.otroLugar.trim() !== '')
+    return !!base && !!form.value.horaEntrega && !!isLugarValid && cartItems.value.length > 0
   }
   return !!base && cartItems.value.length > 0
 })
@@ -246,16 +293,22 @@ const handleSubmit = async () => {
   
   try {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    const finalDireccion = form.value.lugarEntrega === 'Otro (Especificar)' 
+      ? form.value.otroLugar 
+      : form.value.lugarEntrega
+
     const orderData = {
       clienteNombre: form.value.nombre,
       clienteTelefono: form.value.telefono,
       clienteEmail: form.value.email || '',
-      clienteDireccion: deliveryMode.value === 'domicilio' ? form.value.direccion : 'Recoger en local',
-      clienteReferencias: deliveryMode.value === 'domicilio' ? form.value.referencias : '',
+      clienteDireccion: deliveryMode.value === 'domicilio' ? finalDireccion : 'Recoger en local',
+      clienteReferencias: '', // Obsoleto, usamos notasPedido
       pagoMetodo: form.value.pago,
       tipoEntrega: deliveryMode.value,
       total: totalFinal.value,
       costoEnvio: shippingCost.value,
+      horaEntrega: deliveryMode.value === 'domicilio' ? form.value.horaEntrega : '',
+      notasPedido: form.value.notasPedido,
       productos: cartItems.value.map(item => ({
         id: item.id,
         nombre: item.nombre,

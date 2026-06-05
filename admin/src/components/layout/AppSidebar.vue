@@ -244,6 +244,7 @@ const quickAccessItems = computed(() => {
     { icon: PieChartIcon, name: "Estadísticas", path: "/" },
     { icon: CashIcon, name: "POS", path: "/pos" },
     { icon: ListIcon, name: "Órdenes", path: "/ordenes" },
+    { icon: ListIcon, name: "Ludoteca", path: "/ludoteca" },
     { icon: GridIcon, name: "Mesas", path: "/mesas" },
     { icon: ScissorsIcon, name: "Corte", path: "/corte" },
   ];
@@ -295,10 +296,12 @@ const menuGroups = computed(() => {
           name: "Caja",
           subItems: [
             { name: "Órdenes", path: "/ordenes" },
+            { name: "Ludoteca", path: "/ludoteca" },
             { name: "Mesas", path: "/mesas" },
             { name: "POS", path: "/pos" },
             { name: "Ventas", path: "/ventas" },
             { name: "Corte", path: "/corte" },
+            { name: "Uber Eats", path: "/uber-eats" },
           ],
         },
       ],
