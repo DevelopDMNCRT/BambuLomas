@@ -330,7 +330,6 @@ router.beforeEach((to, from, next) => {
     document.title = `${to.meta.title} | Bambu Cloud - Admin`
   }
 
-  /*
   const { isAuthenticated } = useAuth()
   const isPublic = PUBLIC_ROUTES.includes(to.path)
 
