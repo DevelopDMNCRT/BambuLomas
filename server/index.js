@@ -1920,6 +1920,16 @@ app.get('/api/corte', async (req, res) => {
 // Health check
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
+// ─── Rutas de Uber Eats (Sandbox) ────────────────────────────────────────────
+// Cargadas con try/catch para que si fallan NO afecten el servidor principal
+try {
+  const { createUberRouter } = await import('./uber.js');
+  app.use('/api/uber', createUberRouter(pool));
+  console.log('✅ Rutas de Uber Eats registradas en /api/uber');
+} catch (err) {
+  console.warn('⚠️  Uber Eats routes no pudieron cargarse (el servidor sigue funcionando normal):', err.message);
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
