@@ -1,11 +1,11 @@
 <template>
   <AdminLayout>
-    <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto space-y-6">
+    <div class="p-6 space-y-6">
       
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
         <div>
-          <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Pedidos Ludoteca</h1>
+          <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Pedidos Ludoteca</h1>
         </div>
         
         <div class="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-sm">

@@ -1,6 +1,6 @@
 <template>
   <AdminLayout>
-    <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-5xl mx-auto space-y-6">
+    <div class="p-6 space-y-6">
 
       <!-- Banner Sandbox / Producción -->
       <div v-if="isSandbox === false"
@@ -29,9 +29,9 @@
       </div>
 
       <!-- Header + Estado de conexión -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
         <div>
-          <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+          <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
             <span>🛵</span> Uber Eats
           </h1>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestiona tu tienda y pedidos de Uber Eats desde
