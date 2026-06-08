@@ -1385,11 +1385,11 @@ app.post('/api/checador/registro', async (req, res) => {
   }
 
   try {
-    // 1. Validar Distancia (Radio de 100 metros)
+    // 1. Validar Distancia (Radio de 200 metros)
     const distancia = calculateDistance(RESTAURANTE_LAT, RESTAURANTE_LNG, latitud, longitud);
-    if (distancia > 100) {
+    if (distancia > 200) {
       return res.status(403).json({ 
-        error: `Estás fuera del rango permitido. Distancia actual: ${Math.round(distancia)} metros (Máximo 100m).` 
+        error: `Estás fuera del rango permitido. Distancia actual: ${Math.round(distancia)} metros (Máximo 200m).` 
       });
     }
 
