@@ -1,14 +1,14 @@
 <template>
   <AdminLayout>
     <div class="p-6">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
         <div>
           <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Ventas</h1>
           <p class="text-sm text-gray-500 mt-1 font-medium">
             Total (sin canceladas): <span class="text-emerald-600 dark:text-emerald-400 font-bold text-lg">{{ formatCurrency(totalVentas) }}</span>
           </p>
         </div>
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <!-- Flatpickr for Date Range -->
           <div class="relative w-full sm:w-64">
             <flat-pickr

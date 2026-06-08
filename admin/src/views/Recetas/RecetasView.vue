@@ -1,32 +1,33 @@
 <template>
   <AdminLayout>
     <div class="p-6">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6">
         <div>
           <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Recetas</h1>
         </div>
-        <div>
-          <Button size="sm" :startIcon="PlusIcon" @click="goToForm('add')">Agregar receta</Button>
-        </div>
-      </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Buscador rápido -->
+          <div class="relative w-full sm:w-64">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+            </span>
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Buscar receta..."
+              class="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-800 dark:text-white"
+            />
+          </div>
+          <span class="text-sm text-gray-400 dark:text-gray-500 mr-2">{{ filteredRecetas.length }} resultado(s)</span>
 
-      <!-- Buscador rápido -->
-      <div class="mb-4 flex items-center gap-3">
-        <div class="relative flex-1 max-w-xs">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-            </svg>
-          </span>
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Buscar receta..."
-            class="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-          />
+          <!-- Actions -->
+          <div class="flex items-center gap-3">
+            <Button size="sm" :startIcon="PlusIcon" @click="goToForm('add')">Agregar receta</Button>
+          </div>
         </div>
-        <span class="text-sm text-gray-400 dark:text-gray-500">{{ filteredRecetas.length }} resultado(s)</span>
       </div>
 
       <!-- Table -->
