@@ -230,6 +230,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/nomina',
+      name: 'Nomina',
+      component: () => import('../views/Nomina/NominaView.vue'),
+      meta: {
+        title: 'Nómina',
+      },
+    },
+    {
       path: '/mesas',
       name: 'Mesas',
       component: () => import('../views/Mesas/MesasView.vue'),

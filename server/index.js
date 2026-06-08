@@ -1411,7 +1411,30 @@ app.post('/api/checador/registro', async (req, res) => {
       });
     }
 
-    // 3. Registrar Asistencia (el TIMESTAMP lo pone la base de datos)
+    // 3. Validar duplicados y secuencia lógica en el día de hoy
+    const asistHoyRes = await pool.query(`
+      SELECT tipo 
+      FROM asistencias 
+      WHERE usuario_id = $1 
+        AND created_at::date = CURRENT_DATE
+    `, [usuarioId]);
+    
+    const asistenciasHoy = asistHoyRes.rows.map(r => r.tipo);
+
+    if (tipo === 'Entrada') {
+      if (asistenciasHoy.includes('Entrada')) {
+        return res.status(400).json({ error: 'Ya has registrado tu entrada el día de hoy.' });
+      }
+    } else if (tipo === 'Salida') {
+      if (!asistenciasHoy.includes('Entrada')) {
+        return res.status(400).json({ error: 'No puedes registrar salida sin haber registrado tu entrada hoy.' });
+      }
+      if (asistenciasHoy.includes('Salida')) {
+        return res.status(400).json({ error: 'Ya has registrado tu salida el día de hoy.' });
+      }
+    }
+
+    // 4. Registrar Asistencia (el TIMESTAMP lo pone la base de datos)
     const { rows } = await pool.query(
       `INSERT INTO asistencias (usuario_id, tipo, latitud, longitud, distancia_metros)
        VALUES ($1, $2, $3, $4, $5)
@@ -1447,6 +1470,122 @@ app.get('/api/checador/historial', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener historial' });
+  }
+});
+
+// ==========================================
+// RUTAS DE NOMINA
+// ==========================================
+
+// GET /api/nomina
+app.get('/api/nomina', async (req, res) => {
+  const { fecha } = req.query; // YYYY-MM-DD
+  if (!fecha) {
+    return res.status(400).json({ error: 'La fecha es requerida' });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        n.id,
+        n.usuario_id,
+        u.nombre AS usuario,
+        n.rol,
+        TO_CHAR(n.hora_entrada, 'HH24:MI') as hora_entrada,
+        TO_CHAR(n.hora_salida, 'HH24:MI') as hora_salida,
+        TO_CHAR(n.fecha, 'YYYY-MM-DD') as fecha,
+        a.created_at AS hora_real_entrada,
+        s.created_at AS hora_real_salida
+      FROM nomina n
+      JOIN usuarios u ON n.usuario_id = u.id
+      LEFT JOIN (
+        SELECT usuario_id, MIN(created_at) as created_at
+        FROM asistencias 
+        WHERE tipo = 'Entrada' 
+          AND TO_CHAR(created_at, 'YYYY-MM-DD') = $1
+        GROUP BY usuario_id
+      ) a ON n.usuario_id = a.usuario_id
+      LEFT JOIN (
+        SELECT usuario_id, MIN(created_at) as created_at
+        FROM asistencias 
+        WHERE tipo = 'Salida' 
+          AND TO_CHAR(created_at, 'YYYY-MM-DD') = $1
+        GROUP BY usuario_id
+      ) s ON n.usuario_id = s.usuario_id
+      WHERE TO_CHAR(n.fecha, 'YYYY-MM-DD') = $1
+      ORDER BY n.hora_entrada ASC
+    `;
+    const { rows } = await pool.query(query, [fecha]);
+
+    const now = new Date();
+    
+    const result = rows.map(row => {
+      let estado = 'pendiente';
+      let horaExacta = null;
+      let horaExactaSalida = null;
+
+      // Usar la fecha actual (si la busqueda es de hoy) o la fecha del reporte para comparar
+      const horaEntradaDate = new Date(`${fecha}T${row.hora_entrada}:00`);
+      const limitPuntual = new Date(horaEntradaDate.getTime() + 15 * 60000);
+
+      if (row.hora_real_salida) {
+        const horaRealS = new Date(row.hora_real_salida);
+        horaExactaSalida = horaRealS.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+      }
+
+      if (row.hora_real_entrada) {
+        const horaReal = new Date(row.hora_real_entrada);
+        horaExacta = horaReal.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+
+        if (horaReal <= limitPuntual) {
+          estado = 'puntual';
+        } else {
+          estado = 'tarde';
+        }
+      } else {
+        // No ha checado
+        // Si estamos viendo una fecha pasada, asume falta (si now es de un dia despues)
+        // Para simplificar, comparamos si "now" ya superó la hora de entrada de ESE día
+        if (now > horaEntradaDate) {
+          estado = 'falta';
+        } else {
+          estado = 'pendiente';
+        }
+      }
+
+      return {
+        ...row,
+        estadoChecado: estado,
+        horaExacta,
+        horaExactaSalida
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener la nómina' });
+  }
+});
+
+// POST /api/nomina
+app.post('/api/nomina', async (req, res) => {
+  const { usuario_id, rol, hora_entrada, hora_salida, fecha } = req.body;
+
+  if (!usuario_id || !hora_entrada || !hora_salida || !fecha) {
+    return res.status(400).json({ error: 'Faltan datos requeridos' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO nomina (usuario_id, rol, hora_entrada, hora_salida, fecha)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [usuario_id, rol, hora_entrada, hora_salida, fecha]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al crear el registro en nómina' });
   }
 });
 

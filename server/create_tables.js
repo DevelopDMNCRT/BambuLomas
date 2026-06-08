@@ -147,6 +147,20 @@ async function main() {
     `);
     console.log("✅ Índice en 'product_aliases.normalized_description' verificado.");
 
+    // ── TABLA DE NOMINA ────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS nomina (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        rol VARCHAR(100),
+        hora_entrada TIME NOT NULL,
+        hora_salida TIME NOT NULL,
+        fecha DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT now()
+      );
+    `);
+    console.log("✅ Tabla 'nomina' verificada.");
+
     // ── TABLA DE ORDENES (KANBAN) ──────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ordenes (

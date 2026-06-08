@@ -289,6 +289,7 @@ const menuGroups = computed(() => {
             { name: "Clientes", path: "/clientes" },
             { name: "CXC", path: "/cxc" },
             { name: "Checador", path: "/checador" },
+            { name: "Nómina", path: "/nomina" },
           ],
         },
         {
