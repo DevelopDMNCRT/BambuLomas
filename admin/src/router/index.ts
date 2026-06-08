@@ -354,7 +354,6 @@ router.beforeEach((to, from, next) => {
       return next('/recetas')
     }
   }
-  */
 
   next()
 })
