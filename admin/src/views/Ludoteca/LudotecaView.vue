@@ -6,7 +6,6 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Pedidos Ludoteca</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Lista de pedidos activos con punto de entrega en la Ludoteca.</p>
         </div>
         
         <div class="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-sm">

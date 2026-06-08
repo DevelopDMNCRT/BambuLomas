@@ -6,7 +6,6 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Órdenes del Cliente</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestiona los pedidos entrantes y su preparación en tiempo real.</p>
         </div>
         
         <!-- Vista Leyenda / Estado de conexión -->

@@ -6,7 +6,6 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Clientes</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Administra los perfiles de clientes, sus cuentas activas y preferencias de consumo.</p>
         </div>
       </div>
 

@@ -4,7 +4,6 @@
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Recetas</h1>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Gestión de recetas e ingredientes por platillo</p>
         </div>
         <div>
           <Button size="sm" :startIcon="PlusIcon" @click="goToForm('add')">Agregar receta</Button>

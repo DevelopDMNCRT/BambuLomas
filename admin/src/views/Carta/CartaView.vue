@@ -6,9 +6,6 @@
           <h1 class="text-2xl font-semibold text-gray-800 dark:text-white/90">
             Carta / Menú
           </h1>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Gestiona los platillos que estarán disponibles en el punto de venta o eCommerce.
-          </p>
         </div>
         <Button @click="router.push('/carta/form')">Agregar Platillo</Button>
       </div>

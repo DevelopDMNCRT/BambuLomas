@@ -2,9 +2,8 @@
   <AdminLayout>
     <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-      <div>
+      <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-800 dark:text-white/90">Checador</h1>
-        <p class="text-gray-500 text-sm mt-1">Registra tu asistencia (Requiere ubicación)</p>
       </div>
     </div>
 
