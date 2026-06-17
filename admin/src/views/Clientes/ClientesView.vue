@@ -209,6 +209,8 @@ import { ref, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import Modal from '@/components/ui/Modal.vue'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 interface CuentaCliente {
   estado: 'Abierta' | 'Cerrada'
   monto?: number
@@ -244,7 +246,7 @@ const loadingClientes = ref(false)
 const fetchClientes = async () => {
   loadingClientes.value = true
   try {
-    const response = await fetch('http://localhost:3000/api/clientes')
+    const response = await fetch(`${API_URL}/api/clientes`)
     if (!response.ok) throw new Error('Error fetching clientes')
     clientes.value = await response.json()
   } catch (error) {
@@ -297,7 +299,7 @@ const abrirModalOrdenes = async (cliente: Cliente) => {
   ordenesCliente.value = [] // Clear previous orders
   
   try {
-    const response = await fetch(`http://localhost:3000/api/clientes/ordenes?telefono=${encodeURIComponent(cliente.telefono)}&nombre=${encodeURIComponent(cliente.nombre)}`)
+    const response = await fetch(`${API_URL}/api/clientes/ordenes?telefono=${encodeURIComponent(cliente.telefono)}&nombre=${encodeURIComponent(cliente.nombre)}`)
     if (!response.ok) throw new Error('Error fetching ordenes')
     ordenesCliente.value = await response.json()
   } catch (error) {
