@@ -302,6 +302,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/suscriptores',
+      name: 'Suscriptores',
+      component: () => import('../views/Suscriptores/SuscriptoresView.vue'),
+      meta: {
+        title: 'Suscriptores',
+      },
+    },
+    {
       path: '/uber-eats',
       name: 'UberEats',
       component: () => import('../views/UberEats/UberEatsView.vue'),

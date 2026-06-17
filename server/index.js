@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
+import { sendSubscriberEmail } from './mailer.js';
 
 dotenv.config();
 
@@ -2062,21 +2063,42 @@ app.get('/api/corte', async (req, res) => {
 app.get('/api/clientes', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT 
+      `WITH combined AS (
+        SELECT 
+          id::text as id,
+          cliente_nombre as nombre,
+          cliente_telefono as telefono,
+          created_at as ultimoPedido,
+          (estado IN ('Nuevo', 'Preparando')) as cuentaAbierta,
+          1 as is_pedido
+        FROM ordenes
+        WHERE cliente_nombre IS NOT NULL
+        
+        UNION ALL
+        
+        SELECT
+          id::text as id,
+          nombre,
+          numero as telefono,
+          fecha_alta as ultimoPedido,
+          false as cuentaAbierta,
+          0 as is_pedido
+        FROM suscriptores
+      )
+      SELECT 
         MAX(id) as id,
-        UPPER(MAX(cliente_nombre)) as nombre,
-        MAX(cliente_telefono) as telefono,
-        COUNT(*) as pedidos,
-        TO_CHAR(MAX(created_at), 'DD/MM/YYYY HH24:MI') as "ultimoPedido",
-        BOOL_OR(estado IN ('Nuevo', 'Preparando')) as "cuentaAbierta"
-       FROM ordenes
-       WHERE cliente_nombre IS NOT NULL
-       GROUP BY 
-         CASE 
-           WHEN cliente_telefono IN ('N/A', 'n/a', '', 'null') OR cliente_telefono IS NULL THEN UPPER(cliente_nombre)
-           ELSE cliente_telefono
-         END
-       ORDER BY MAX(created_at) DESC`
+        UPPER(MAX(nombre)) as nombre,
+        MAX(telefono) as telefono,
+        SUM(is_pedido) as pedidos,
+        TO_CHAR(MAX(ultimoPedido), 'DD/MM/YYYY HH24:MI') as "ultimoPedido",
+        BOOL_OR(cuentaAbierta) as "cuentaAbierta"
+      FROM combined
+      GROUP BY 
+        CASE 
+          WHEN telefono IN ('N/A', 'n/a', '', 'null') OR telefono IS NULL THEN UPPER(nombre)
+          ELSE telefono
+        END
+      ORDER BY MAX(ultimoPedido) DESC`
     );
 
     const clientes = rows.map(r => ({
@@ -2147,6 +2169,84 @@ app.get('/api/clientes/ordenes', async (req, res) => {
   }
 });
 
+
+// ── SUSCRIPTORES ────────────────────────────────────────────
+
+// GET /api/suscriptores - Obtener lista
+app.get('/api/suscriptores', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM suscriptores ORDER BY fecha_alta DESC');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error al obtener suscriptores:', err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/suscriptores - Crear suscriptor y enviar email
+app.post('/api/suscriptores', async (req, res) => {
+  const { nombre, numero, correo } = req.body;
+  if (!nombre || !correo) {
+    return res.status(400).json({ error: 'Nombre y correo son requeridos.' });
+  }
+
+  try {
+    const id = Math.floor(10000 + Math.random() * 90000).toString();
+    
+    // Insert into DB
+    const insertQuery = `
+      INSERT INTO suscriptores (id, nombre, numero, correo)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(insertQuery, [id, nombre, numero, correo]);
+
+    // Send email
+    if (correo) {
+      // fire and forget or await
+      sendSubscriberEmail(correo, nombre, id).catch(err => console.error("Error envío:", err));
+    }
+
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Error al crear suscriptor:', err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// PUT /api/suscriptores/:id - Actualizar
+app.put('/api/suscriptores/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, numero, correo } = req.body;
+  try {
+    const query = `
+      UPDATE suscriptores
+      SET nombre = $1, numero = $2, correo = $3
+      WHERE id = $4
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(query, [nombre, numero, correo, id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Suscriptor no encontrado' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error al actualizar suscriptor:', err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE /api/suscriptores/:id - Eliminar
+app.delete('/api/suscriptores/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const query = 'DELETE FROM suscriptores WHERE id = $1 RETURNING *;';
+    const { rows } = await pool.query(query, [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Suscriptor no encontrado' });
+    res.json({ message: 'Suscriptor eliminado con éxito' });
+  } catch (err) {
+    console.error('Error al eliminar suscriptor:', err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
 
 // Health check
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
