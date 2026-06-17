@@ -11,12 +11,16 @@
             <p class="text-[11px] text-brand-600 font-medium">
               Orden #{{ currentOrderNum }}
               <span v-if="mesaActual" class="ml-2 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold">Mesa {{ mesaActual }}</span>
-              <span v-if="cxcClientName" class="ml-2 px-1.5 py-0.5 rounded bg-error-100 dark:bg-error-500/20 text-error-700 dark:text-error-400 font-bold">Liquidación de CXC: {{ cxcClientName }}</span>
             </p>
           </div>
-          <button @click="clearCart" class="text-gray-400 hover:text-error-500 transition-colors" title="Limpiar orden">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <button @click="openDiscountModal" class="p-1.5 rounded-lg bg-brand-100 text-brand-600 hover:bg-brand-200 dark:bg-brand-500/20 dark:text-brand-400 dark:hover:bg-brand-500/30 transition-colors font-bold text-sm h-8 w-8 flex items-center justify-center" title="Aplicar descuento">
+              %
+            </button>
+            <button @click="clearCart" class="p-1.5 rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-colors h-8 w-8 flex items-center justify-center shadow-sm" title="Limpiar orden">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
         </div>
 
         <!-- Cart Items -->
@@ -60,15 +64,19 @@
           <div class="space-y-1 mb-3">
             <div class="flex justify-between text-xs">
               <span class="text-gray-500">Subtotal</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCurrency(subtotal) }}</span>
+              <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCurrency(subtotalSinDescuento) }}</span>
             </div>
-            <div class="flex justify-between text-xs">
-              <span class="text-gray-500">IVA (16%)</span>
-              <span class="font-medium text-gray-700 dark:text-gray-300">{{ formatCurrency(subtotal * 0.16) }}</span>
+            <div v-if="discount.amount > 0" class="flex justify-between text-xs mt-1">
+              <span class="text-gray-500">Descuento</span>
+              <span class="font-medium text-brand-600 dark:text-brand-400">-{{ formatCurrency(discount.amount) }}</span>
+            </div>
+            <div v-if="cxcClientName" class="flex justify-between items-center text-xs mt-1">
+              <span class="text-gray-500">Cobro</span>
+              <span class="px-1.5 py-0.5 rounded bg-error-100 dark:bg-error-500/20 text-error-700 dark:text-error-400 font-bold">Liquidación de CXC: {{ cxcClientName }}</span>
             </div>
             <div class="pt-1.5 mt-1.5 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
               <span class="font-bold text-sm text-gray-800 dark:text-white">Total</span>
-              <span class="text-xl font-black text-brand-600 dark:text-brand-400">{{ formatCurrency(subtotal * 1.16) }}</span>
+              <span class="text-xl font-black text-brand-600 dark:text-brand-400">{{ formatCurrency(subtotal) }}</span>
             </div>
           </div>
           <button @click="openPaymentModal" class="w-full py-3 rounded-xl bg-[#2D5A5A] text-white font-bold text-sm hover:bg-[#244a4a] transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2" :disabled="cart.length === 0" :class="{ 'opacity-50 cursor-not-allowed': cart.length === 0 }">
@@ -81,16 +89,22 @@
       <!-- ═══ RIGHT: Products Panel ═══ -->
       <div class="flex-1 flex flex-col bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-theme-sm overflow-hidden order-1 lg:order-2">
         <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col gap-4">
-          <div class="flex justify-between items-center">
-            <h1 class="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Menú</h1>
-            <button
-              @click="showPrices = !showPrices"
-              :class="showPrices ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
-              class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all"
-              title="Mostrar/Ocultar Precios"
-            >
-              $
-            </button>
+          <div class="flex justify-between items-center gap-4">
+            <h1 class="text-2xl font-black text-gray-800 dark:text-white tracking-tight shrink-0">Menú</h1>
+            <div class="flex items-center gap-2 flex-1 justify-end">
+              <div class="relative w-full max-w-[200px] sm:max-w-xs">
+                <input v-model="searchQuery" type="text" placeholder="Buscar..." class="w-full pl-9 pr-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-800 dark:text-white placeholder-gray-400 transition-all" />
+                <svg class="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <button
+                @click="showPrices = !showPrices"
+                :class="showPrices ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
+                class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all shrink-0"
+                title="Mostrar/Ocultar Precios"
+              >
+                $
+              </button>
+            </div>
           </div>
 
           <!-- Category Tabs -->
@@ -209,7 +223,7 @@
     <Teleport to="body">
       <div v-if="showPaymentModal" class="fixed inset-0 z-[999999] flex items-center justify-center p-4">
         <div class="absolute inset-0 custom-modal-backdrop" @click="closePaymentModal"></div>
-        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-modal-in">
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-gray-200 dark:border-gray-700 animate-modal-in">
 
           <!-- Header -->
           <div class="p-5 border-b border-gray-100 dark:border-gray-800">
@@ -225,9 +239,9 @@
                 <span class="text-gray-500">{{ cart.length }} producto(s)</span>
                 <span class="text-gray-500">Subtotal: {{ formatCurrency(subtotal) }}</span>
               </div>
-              <div class="flex justify-between items-center">
+              <div class="flex justify-between items-center mt-1">
                 <span class="font-bold text-gray-800 dark:text-white">Total a cobrar</span>
-                <span class="text-2xl font-black text-brand-600 dark:text-brand-400">{{ formatCurrency(subtotal * 1.16) }}</span>
+                <span class="text-2xl font-black text-brand-600 dark:text-brand-400">{{ formatCurrency(subtotal) }}</span>
               </div>
             </div>
 
@@ -248,14 +262,33 @@
             </div>
 
             <!-- Cliente CXC (Conditional) -->
-            <div v-if="paymentData.method === 'cxc' && !cxcClientName" class="animate-modal-in">
-              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Cliente (Deudor)</label>
-              <input v-model="paymentData.clientName" @input="paymentData.clientName = ($event.target as HTMLInputElement).value.toUpperCase()" type="text" placeholder="Ej. JUAN PÉREZ" class="w-full mt-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all uppercase">
+            <div v-if="paymentData.method === 'cxc' && !cxcClientName" class="animate-modal-in relative">
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Cliente</label>
+              <input 
+                v-model="paymentData.clientName" 
+                @focus="cxcSearchFocused = true"
+                @blur="setTimeout(() => cxcSearchFocused = false, 200)"
+                @input="paymentData.clientName = ($event.target as HTMLInputElement).value.toUpperCase()" 
+                type="text" 
+                placeholder="Ej. JUAN PÉREZ" 
+                class="w-full mt-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all uppercase"
+              >
+              <!-- Dropdown autocomplete -->
+              <div v-if="cxcSearchFocused && filteredCxcOptions.length > 0" class="absolute z-[100] w-full mt-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl max-h-48 overflow-y-auto overflow-hidden">
+                <button 
+                  v-for="opt in filteredCxcOptions" 
+                  :key="opt"
+                  @click="paymentData.clientName = opt; cxcSearchFocused = false"
+                  class="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-semibold text-gray-800 dark:text-gray-200 transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-0"
+                >
+                  {{ opt }}
+                </button>
+              </div>
             </div>
           </div>
 
           <!-- Footer -->
-          <div class="p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex gap-3">
+          <div class="p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex gap-3 rounded-b-2xl">
             <button @click="closePaymentModal" class="flex-1 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">Cancelar</button>
             <button @click="processPayment"
               :disabled="!canProcessPayment || isProcessingPayment"
@@ -302,6 +335,36 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- ═══ MODAL: Discount ═══ -->
+    <Teleport to="body">
+      <div v-if="showDiscountModal" class="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+        <div class="absolute inset-0 custom-modal-backdrop" @click="closeDiscountModal"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-modal-in">
+          <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white">Aplicar Descuento</h3>
+            <button @click="closeDiscountModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="p-5 space-y-4">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">Monto del descuento ($)</label>
+              <input v-model.number="tempDiscount.amount" type="number" min="0" :max="subtotalSinDescuento" class="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white outline-none focus:border-brand-500" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">Motivo</label>
+              <input v-model="tempDiscount.reason" type="text" placeholder="Ej. Promoción especial" class="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white outline-none focus:border-brand-500" />
+            </div>
+          </div>
+          <div class="p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+            <button @click="applyDiscount" class="w-full py-3 rounded-xl bg-brand-500 text-white font-bold hover:bg-brand-600 transition-all shadow-md">
+              Confirmar Descuento
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </AdminLayout>
 </template>
 
@@ -330,6 +393,25 @@ const cart = ref<any[]>([]);
 const showPrices = ref(true);
 const activeCategoria = ref('Todos');
 const currentOrderNum = ref(1024);
+const searchQuery = ref('');
+
+const showDiscountModal = ref(false);
+const discount = ref({ amount: 0, reason: '' });
+const tempDiscount = ref({ amount: 0, reason: '' });
+
+const openDiscountModal = () => {
+  tempDiscount.value = { ...discount.value };
+  showDiscountModal.value = true;
+};
+
+const closeDiscountModal = () => {
+  showDiscountModal.value = false;
+};
+
+const applyDiscount = () => {
+  discount.value = { ...tempDiscount.value };
+  showDiscountModal.value = false;
+};
 
 // ── Variable Modal State ──
 const showVariableModal = ref(false);
@@ -357,6 +439,29 @@ const availablePaymentMethods = computed(() => {
   return paymentMethods;
 });
 
+// ── Autocomplete CXC Clients ──
+const cxcClientesOptions = ref<string[]>([]);
+const cxcSearchFocused = ref(false);
+
+const filteredCxcOptions = computed(() => {
+  const query = paymentData.value.clientName.trim().toUpperCase();
+  if (!query) return []; // Ocultar si no hay texto
+  return cxcClientesOptions.value.filter(c => c.toUpperCase().includes(query) && c.toUpperCase() !== query);
+});
+
+const fetchCxcClientes = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/clientes`);
+    if (res.ok) {
+      const data = await res.json();
+      const noPhoneClients = data.filter((c: any) => c.telefono === 'N/A' || !c.telefono);
+      cxcClientesOptions.value = noPhoneClients.map((c: any) => c.nombre);
+    }
+  } catch(e) {
+    console.error('Error al cargar clientes CXC:', e);
+  }
+};
+
 // ── Categories ──
 const categorias = computed(() => {
   const cats = new Set(platillos.value.map(p => p.categoria));
@@ -364,8 +469,15 @@ const categorias = computed(() => {
 });
 
 const platillosFiltrados = computed(() => {
-  if (activeCategoria.value === 'Todos') return platillos.value;
-  return platillos.value.filter(p => p.categoria === activeCategoria.value);
+  let list = platillos.value;
+  if (activeCategoria.value !== 'Todos') {
+    list = list.filter(p => p.categoria === activeCategoria.value);
+  }
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase().trim();
+    list = list.filter(p => p.nombre.toLowerCase().includes(q));
+  }
+  return list;
 });
 
 // ── Fetch ──
@@ -470,7 +582,7 @@ onMounted(async () => {
     cxcClientName.value = cxcQuery as string;
   }
   
-  await Promise.all([fetchPlatillos(), fetchRecetas()]);
+  await Promise.all([fetchPlatillos(), fetchRecetas(), fetchCxcClientes()]);
   
   // After platillos loaded, restore cart from mesa if there's a saved order
   if (mesaActual.value !== null) {
@@ -692,6 +804,7 @@ const updateQty = (index: number, delta: number) => {
 const clearCart = () => {
   if (confirm('¿Seguro que deseas limpiar toda la orden?')) {
     cart.value = [];
+    discount.value = { amount: 0, reason: '' };
     // Also clear mesa orden storage
     if (mesaActual.value !== null) {
       actualizarOrdenMesa(mesaActual.value, []);
@@ -709,8 +822,12 @@ const calcItemTotal = (item: any) => {
   return base * item.cantidad;
 };
 
-const subtotal = computed(() => {
+const subtotalSinDescuento = computed(() => {
   return cart.value.reduce((sum, item) => sum + calcItemTotal(item), 0);
+});
+
+const subtotal = computed(() => {
+  return Math.max(0, subtotalSinDescuento.value - discount.value.amount);
 });
 
 const formatCurrency = (value: number) => {
@@ -763,9 +880,10 @@ const processPayment = async () => {
           clienteReferencias: 'POS CXC',
           pagoMetodo: 'CXC',
           tipoEntrega: 'local',
-          total: subtotal.value * 1.16,
+          total: subtotal.value,
           costoEnvio: 0,
           estado: 'Completada',
+          notas_pedido: discount.value.amount > 0 ? `Descuento aplicado: -$${discount.value.amount} (${discount.value.reason})` : '',
           usuarioCobro: getUser()?.nombre || (getUser() as any)?.usuario || 'Desconocido',
           productos: cart.value.map(c => ({
             id: c.platillo.id,
@@ -783,7 +901,7 @@ const processPayment = async () => {
       orderNum: currentOrderNum.value,
       clientName: cxcClientName.value || paymentData.value.clientName || '',
       methodLabel: method?.label || '',
-      total: subtotal.value * 1.16
+      total: subtotal.value
     };
     showPaymentModal.value = false;
     showConfirmationModal.value = true;
@@ -797,6 +915,7 @@ const processPayment = async () => {
 const closeConfirmationModal = () => {
   showConfirmationModal.value = false;
   cart.value = [];
+  discount.value = { amount: 0, reason: '' };
   currentOrderNum.value++;
   
   if (cxcClientName.value) {

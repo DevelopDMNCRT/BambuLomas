@@ -1926,13 +1926,13 @@ app.get('/api/ventas', async (req, res) => {
 app.get('/api/cxc', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT cliente_nombre as "nombre",
+      `SELECT UPPER(cliente_nombre) as "nombre",
               COUNT(id) as "ordenesCount",
               MAX(created_at) as "ultimaFecha",
               SUM(total) as "totalDeuda"
        FROM ordenes
        WHERE LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'
-       GROUP BY cliente_nombre
+       GROUP BY UPPER(cliente_nombre)
        ORDER BY "ultimaFecha" DESC`
     );
     
@@ -1959,7 +1959,7 @@ app.get('/api/cxc/:cliente', async (req, res) => {
               productos
        FROM ordenes
        WHERE LOWER(pago_metodo) = 'cxc' 
-         AND cliente_nombre = $1 
+         AND UPPER(cliente_nombre) = UPPER($1) 
          AND estado != 'Cancelada'
        ORDER BY created_at ASC`,
       [cliente]
@@ -1989,7 +1989,7 @@ app.post('/api/cxc/pagar', async (req, res) => {
     const { rowCount } = await pool.query(
       `UPDATE ordenes
        SET pago_metodo = $1
-       WHERE cliente_nombre = $2 AND LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'`,
+       WHERE UPPER(cliente_nombre) = UPPER($2) AND LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'`,
       [metodoPago, clienteNombre]
     );
 
@@ -2055,6 +2055,98 @@ app.get('/api/corte', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener el corte de caja' });
   }
 });
+
+// ── CLIENTES ──────────────────────────────────────────────
+
+// GET /api/clientes — Lista de clientes (agrupando ordenes por telefono)
+app.get('/api/clientes', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 
+        MAX(id) as id,
+        UPPER(MAX(cliente_nombre)) as nombre,
+        MAX(cliente_telefono) as telefono,
+        COUNT(*) as pedidos,
+        TO_CHAR(MAX(created_at), 'DD/MM/YYYY HH24:MI') as "ultimoPedido",
+        BOOL_OR(estado IN ('Nuevo', 'Preparando')) as "cuentaAbierta"
+       FROM ordenes
+       WHERE cliente_nombre IS NOT NULL
+       GROUP BY 
+         CASE 
+           WHEN cliente_telefono IN ('N/A', 'n/a', '', 'null') OR cliente_telefono IS NULL THEN UPPER(cliente_nombre)
+           ELSE cliente_telefono
+         END
+       ORDER BY MAX(created_at) DESC`
+    );
+
+    const clientes = rows.map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      telefono: r.telefono || 'N/A',
+      pedidos: parseInt(r.pedidos, 10),
+      ultimoPedido: r.ultimoPedido,
+      platilloFavorito: 'Ver historial', // Simplificado
+      cuenta: {
+        estado: r.cuentaAbierta ? 'Abierta' : 'Cerrada'
+      }
+    }));
+
+    res.json(clientes);
+  } catch (err) {
+    console.error('Error al obtener clientes:', err);
+    res.status(500).json({ error: 'Error al obtener clientes' });
+  }
+});
+
+// GET /api/clientes/ordenes — Historial de ordenes de un cliente
+app.get('/api/clientes/ordenes', async (req, res) => {
+  try {
+    const { telefono, nombre } = req.query;
+    let queryStr = '';
+    let queryParams = [];
+
+    if (!telefono || telefono.toUpperCase() === 'N/A' || telefono === 'null' || telefono === '') {
+      queryStr = `SELECT id, numero_pedido, TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') as fecha, productos, total
+                  FROM ordenes 
+                  WHERE UPPER(cliente_nombre) = UPPER($1) 
+                    AND (cliente_telefono IN ('N/A', 'n/a', '', 'null') OR cliente_telefono IS NULL)
+                  ORDER BY created_at DESC`;
+      queryParams = [nombre];
+    } else {
+      queryStr = `SELECT id, numero_pedido, TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') as fecha, productos, total
+                  FROM ordenes WHERE cliente_telefono = $1 ORDER BY created_at DESC`;
+      queryParams = [telefono];
+    }
+
+    const { rows } = await pool.query(queryStr, queryParams);
+
+    const ordenes = rows.map(r => {
+      let prodsArr = [];
+      try {
+        prodsArr = typeof r.productos === 'string' ? JSON.parse(r.productos) : r.productos;
+      } catch (e) {
+        prodsArr = [];
+      }
+      
+      const nombresProductos = Array.isArray(prodsArr) 
+        ? prodsArr.map(p => p.nombre || p.producto || p.name || 'Producto').join(', ')
+        : 'Productos';
+
+      return {
+        id: r.numero_pedido || `#ORD-${r.id}`,
+        fecha: r.fecha,
+        productos: nombresProductos,
+        total: parseFloat(r.total) || 0
+      };
+    });
+
+    res.json(ordenes);
+  } catch (err) {
+    console.error('Error al obtener historial del cliente:', err);
+    res.status(500).json({ error: 'Error al obtener historial del cliente' });
+  }
+});
+
 
 // Health check
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));

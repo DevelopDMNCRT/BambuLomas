@@ -76,7 +76,8 @@
               <tr 
                 v-for="cliente in clientesFiltrados" 
                 :key="cliente.id"
-                class="border-t border-gray-100 dark:border-gray-800"
+                @click="abrirModalOrdenes(cliente)"
+                class="border-t border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors duration-150"
               >
                 <td class="px-5 py-4">
                   <span class="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
@@ -117,12 +118,96 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal de Órdenes del Cliente -->
+    <Modal 
+      v-if="isModalOpen" 
+      :fullScreenBackdrop="true" 
+      @close="cerrarModal"
+    >
+      <template #body>
+        <div class="relative w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all border border-gray-100 dark:border-gray-800 p-6 m-4 max-h-[90vh] flex flex-col">
+          
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+            <div>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                Órdenes de {{ selectedCliente?.nombre }}
+              </h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Historial de pedidos recientes
+              </p>
+            </div>
+            <button 
+              @click="cerrarModal"
+              class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body / Table -->
+          <div class="overflow-y-auto custom-scrollbar flex-1">
+            <div class="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <table class="min-w-full">
+                <thead class="bg-gray-50 dark:bg-gray-800/50">
+                  <tr class="border-b border-gray-200 dark:border-gray-800">
+                    <th class="px-5 py-3 text-left">
+                      <p class="font-semibold text-gray-600 text-xs uppercase tracking-wider dark:text-gray-400">ID Orden</p>
+                    </th>
+                    <th class="px-5 py-3 text-left">
+                      <p class="font-semibold text-gray-600 text-xs uppercase tracking-wider dark:text-gray-400">Fecha</p>
+                    </th>
+                    <th class="px-5 py-3 text-left">
+                      <p class="font-semibold text-gray-600 text-xs uppercase tracking-wider dark:text-gray-400">Productos</p>
+                    </th>
+                    <th class="px-5 py-3 text-right">
+                      <p class="font-semibold text-gray-600 text-xs uppercase tracking-wider dark:text-gray-400">Total</p>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-transparent">
+                  <tr v-for="orden in ordenesCliente" :key="orden.id" class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                    <td class="px-5 py-4 whitespace-nowrap">
+                      <span class="font-medium text-brand-600 dark:text-brand-400 text-sm">{{ orden.id }}</span>
+                    </td>
+                    <td class="px-5 py-4 whitespace-nowrap">
+                      <p class="text-sm text-gray-600 dark:text-gray-300">{{ orden.fecha }}</p>
+                    </td>
+                    <td class="px-5 py-4">
+                      <p class="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">{{ orden.productos }}</p>
+                    </td>
+                    <td class="px-5 py-4 whitespace-nowrap text-right">
+                      <p class="text-sm font-bold text-gray-900 dark:text-white">${{ orden.total.toFixed(2) }}</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Footer -->
+          <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end shrink-0">
+            <button 
+              @click="cerrarModal"
+              class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-white rounded-xl font-medium transition-colors text-sm"
+            >
+              Cerrar
+            </button>
+          </div>
+
+        </div>
+      </template>
+    </Modal>
   </AdminLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
+import Modal from '@/components/ui/Modal.vue'
 
 interface CuentaCliente {
   estado: 'Abierta' | 'Cerrada'
@@ -139,75 +224,39 @@ interface Cliente {
   ultimoPedido: string
 }
 
+interface Orden {
+  id: string
+  fecha: string
+  productos: string
+  total: number
+}
+
+const isModalOpen = ref(false)
+const selectedCliente = ref<Cliente | null>(null)
+const ordenesCliente = ref<Orden[]>([])
+
 const filtroCuenta = ref<'todas' | 'cerradas'>('todas')
 const busqueda = ref('')
 
-// Hardcodeo de ejemplos realistas basados en tu sistema
-const clientesMock = ref<Cliente[]>([
-  {
-    id: 1,
-    nombre: 'Mario',
-    telefono: '5510108014',
-    cuenta: { estado: 'Abierta', monto: 556.00 },
-    pedidos: 15,
-    platilloFavorito: 'Molletes Gourmet',
-    ultimoPedido: '28/05/2026 09:00'
-  },
-  {
-    id: 2,
-    nombre: 'Elmer Cervantes',
-    telefono: '3312345678',
-    cuenta: { estado: 'Cerrada' },
-    pedidos: 8,
-    platilloFavorito: 'Tacos',
-    ultimoPedido: '27/05/2026 18:30'
-  },
-  {
-    id: 3,
-    nombre: 'Ricardo',
-    telefono: '5587654321',
-    cuenta: { estado: 'Abierta', monto: 320.00 },
-    pedidos: 24,
-    platilloFavorito: 'Molletes Gourmet',
-    ultimoPedido: '28/05/2026 08:15'
-  },
-  {
-    id: 4,
-    nombre: 'Ana Gómez',
-    telefono: '5543210987',
-    cuenta: { estado: 'Cerrada' },
-    pedidos: 5,
-    platilloFavorito: 'Coca',
-    ultimoPedido: '25/05/2026 14:20'
-  },
-  {
-    id: 5,
-    nombre: 'Sofia Ruiz',
-    telefono: '3398765432',
-    cuenta: { estado: 'Cerrada' },
-    pedidos: 12,
-    platilloFavorito: 'Molletes Gourmet',
-    ultimoPedido: '21/05/2026 11:45'
-  },
-  {
-    id: 6,
-    nombre: 'Carlos Mendoza',
-    telefono: '5598761234',
-    cuenta: { estado: 'Abierta', monto: 185.50 },
-    pedidos: 30,
-    platilloFavorito: 'Tacos',
-    ultimoPedido: '28/05/2026 09:12'
-  },
-  {
-    id: 7,
-    nombre: 'Gabriela Torres',
-    telefono: '3387654321',
-    cuenta: { estado: 'Cerrada' },
-    pedidos: 2,
-    platilloFavorito: 'Latte',
-    ultimoPedido: '14/05/2026 16:30'
+const clientes = ref<Cliente[]>([])
+const loadingClientes = ref(false)
+
+const fetchClientes = async () => {
+  loadingClientes.value = true
+  try {
+    const response = await fetch('http://localhost:3000/api/clientes')
+    if (!response.ok) throw new Error('Error fetching clientes')
+    clientes.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching clientes:', error)
+  } finally {
+    loadingClientes.value = false
   }
-])
+}
+
+onMounted(() => {
+  fetchClientes()
+})
 
 // Helper para extraer iniciales de perfil
 const obtenerIniciales = (nombre: string): string => {
@@ -221,7 +270,7 @@ const obtenerIniciales = (nombre: string): string => {
 
 // Filtrar clientes basados en switch y búsqueda
 const clientesFiltrados = computed(() => {
-  return clientesMock.value.filter(cliente => {
+  return clientes.value.filter(cliente => {
     // 1. Filtrar por tipo de cuenta
     if (filtroCuenta.value === 'cerradas' && cliente.cuenta.estado !== 'Cerrada') {
       return false
@@ -238,6 +287,33 @@ const clientesFiltrados = computed(() => {
     return true
   })
 })
+
+const loadingOrdenes = ref(false)
+
+const abrirModalOrdenes = async (cliente: Cliente) => {
+  selectedCliente.value = cliente
+  isModalOpen.value = true
+  loadingOrdenes.value = true
+  ordenesCliente.value = [] // Clear previous orders
+  
+  try {
+    const response = await fetch(`http://localhost:3000/api/clientes/ordenes?telefono=${encodeURIComponent(cliente.telefono)}&nombre=${encodeURIComponent(cliente.nombre)}`)
+    if (!response.ok) throw new Error('Error fetching ordenes')
+    ordenesCliente.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching ordenes:', error)
+  } finally {
+    loadingOrdenes.value = false
+  }
+}
+
+const cerrarModal = () => {
+  isModalOpen.value = false
+  setTimeout(() => {
+    selectedCliente.value = null
+    ordenesCliente.value = []
+  }, 300)
+}
 </script>
 
 <style scoped>
