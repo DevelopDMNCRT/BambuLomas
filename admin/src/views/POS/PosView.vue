@@ -267,7 +267,7 @@
               <input 
                 v-model="paymentData.clientName" 
                 @focus="cxcSearchFocused = true"
-                @blur="setTimeout(() => cxcSearchFocused = false, 200)"
+                @blur="hideCxcSearch"
                 @input="paymentData.clientName = ($event.target as HTMLInputElement).value.toUpperCase()" 
                 type="text" 
                 placeholder="Ej. JUAN PÉREZ" 
@@ -460,6 +460,12 @@ const fetchCxcClientes = async () => {
   } catch(e) {
     console.error('Error al cargar clientes CXC:', e);
   }
+};
+
+const hideCxcSearch = () => {
+  setTimeout(() => {
+    cxcSearchFocused.value = false;
+  }, 200);
 };
 
 // ── Categories ──
