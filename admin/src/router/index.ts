@@ -306,7 +306,7 @@ const router = createRouter({
       name: 'Suscriptores',
       component: () => import('../views/Suscriptores/SuscriptoresView.vue'),
       meta: {
-        title: 'Suscriptores',
+        title: 'Lealtad',
       },
     },
     {

@@ -78,6 +78,19 @@
                   <input v-model="form.email" type="email" placeholder="correo@ejemplo.com" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
                 </div>
               </div>
+              
+              <div class="mt-4">
+                <label class="text-sm font-bold text-[#4F817D] mb-1.5 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
+                  ID de Cliente / Lealtad (Opcional)
+                </label>
+                <input v-model="form.suscriptorId" @blur="checkLoyaltyId" type="text" placeholder="Ingresa tu ID de lealtad" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-[#4F817D] transition-colors" />
+                <p v-if="isVerifyingId" class="text-xs text-[#4F817D] mt-1.5 font-bold animate-pulse">Buscando cliente...</p>
+                <p v-else-if="welcomeData" class="text-xs text-green-600 dark:text-green-400 mt-1.5 font-bold">✓ ¡Cliente encontrado! Hola, {{ welcomeData.nombre.split(' ')[0] }}.</p>
+                <p v-else-if="idNotFound" class="text-xs text-red-500 mt-1.5 font-bold">ID no encontrado. Verifica que esté correcto.</p>
+                <p v-else class="text-xs text-gray-500 mt-1.5">Agrega tu ID para sumar puntos a tu Camino de Lealtad.</p>
+              </div>
+
             </div>
           </div>
 
@@ -218,6 +231,38 @@
       </button>
     </div>
   </div>
+
+  <!-- Welcome / Loyalty Modal -->
+  <div v-if="showWelcomeModal" class="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm transition-opacity">
+    <div class="bg-white dark:bg-gray-900 rounded-[24px] p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+      <!-- Decoración -->
+      <div class="absolute top-0 left-0 w-full h-2 bg-[#4F817D]"></div>
+      
+      <div class="w-16 h-16 bg-[#E8F3F1] dark:bg-[#2D5A5A]/30 rounded-full flex items-center justify-center mx-auto mb-4 text-[#4F817D] dark:text-[#6ca8a1]">
+        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+        </svg>
+      </div>
+      <h2 class="text-2xl font-black text-gray-900 dark:text-white mb-2">¡Hola, {{ welcomeData?.nombre?.split(' ')[0] }}!</h2>
+      <p class="text-gray-500 dark:text-gray-400 mb-5">
+        Tus datos se han autocompletado y tienes <strong>{{ welcomeData?.pedidos_lealtad || 0 }} pedidos</strong> en tu Camino de Lealtad.
+        <br v-if="welcomeData?.recompensaAñadida" />
+        <strong v-if="welcomeData?.recompensaAñadida" class="text-[#4F817D] mt-2 block">¡Felicidades! Hemos añadido tu recompensa gratis al carrito.</strong>
+      </p>
+      
+      <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-6 border border-gray-100 dark:border-gray-700">
+        <p class="text-sm text-gray-600 dark:text-gray-300 font-medium text-left space-y-1.5">
+          <span class="block">✓ Nombre: <span class="font-bold text-gray-900 dark:text-white">{{ welcomeData?.nombre }}</span></span>
+          <span class="block">✓ Teléfono: <span class="font-bold text-gray-900 dark:text-white">{{ welcomeData?.telefono || 'N/A' }}</span></span>
+          <span class="block">✓ Correo: <span class="font-bold text-gray-900 dark:text-white">{{ welcomeData?.correo || 'N/A' }}</span></span>
+        </p>
+      </div>
+
+      <button @click="showWelcomeModal = false" class="w-full py-3.5 bg-[#4F817D] hover:bg-[#2D5A5A] text-white rounded-xl font-bold transition-colors">
+        Continuar con el Pedido
+      </button>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -239,8 +284,86 @@ const form = ref({
   lugarEntrega: '',
   otroLugar: '',
   notasPedido: '',
-  pago: 'Efectivo'
+  pago: 'Efectivo',
+  suscriptorId: ''
 })
+
+const isVerifyingId = ref(false)
+const idNotFound = ref(false)
+const welcomeData = ref<any>(null)
+const showWelcomeModal = ref(false)
+
+const checkLoyaltyId = async () => {
+  const id = form.value.suscriptorId.trim()
+  if (!id) {
+    welcomeData.value = null
+    idNotFound.value = false
+    return
+  }
+  
+  // No re-verificar si ya tenemos la data correcta para este ID
+  if (welcomeData.value && String(welcomeData.value.id) === id) return
+
+  isVerifyingId.value = true
+  idNotFound.value = false
+  welcomeData.value = null
+  
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+    const res = await fetch(`${apiUrl}/api/suscriptores`)
+    if (res.ok) {
+      const subs = await res.json()
+      const found = subs.find((s: any) => String(s.id).trim() === id)
+      
+      if (found) {
+        // Rellenar datos de contacto automáticamente
+        if (found.nombre) form.value.nombre = found.nombre
+        if (found.numero && found.numero !== 'N/A') {
+          form.value.telefono = found.numero.replace(/\D/g, '').slice(0, 10)
+        }
+        if (found.correo) form.value.email = found.correo
+        
+        // Comprobar recompensa
+        const recompensasDisponibles = Math.floor((found.pedidos_lealtad || 0) / 10) - (found.recompensas_reclamadas || 0)
+        if (recompensasDisponibles > 0) {
+          try {
+            const platRes = await fetch(`${apiUrl}/api/platillos`)
+            if (platRes.ok) {
+              const platillos = await platRes.json()
+              const rewardProduct = platillos.find((p: any) => p.categoria?.toLowerCase() === 'recompensa')
+              if (rewardProduct) {
+                // Check if not already added
+                const alreadyHasReward = cartItems.value.some(item => item.productId === Number(rewardProduct.id) && item.precio === 0)
+                if (!alreadyHasReward) {
+                  cartItems.value.push({
+                    id: 'reward-' + Date.now(),
+                    productId: Number(rewardProduct.id),
+                    nombre: rewardProduct.nombre,
+                    precio: 0,
+                    cantidad: 1,
+                    imagenUrl: rewardProduct.imagenUrl || ''
+                  })
+                }
+                found.recompensaAñadida = true
+              }
+            }
+          } catch (e) {
+            console.error('Error al agregar recompensa:', e)
+          }
+        }
+        
+        welcomeData.value = found
+        showWelcomeModal.value = true
+      } else {
+        idNotFound.value = true
+      }
+    }
+  } catch (error) {
+    console.error('Error verificando ID:', error)
+  } finally {
+    isVerifyingId.value = false
+  }
+}
 
 const lugaresDeEntrega = [
   'Barra', 'Ludoteca', 'Torniquetes Telcel', 'Royal Canin', 
@@ -309,6 +432,8 @@ const handleSubmit = async () => {
       costoEnvio: shippingCost.value,
       horaEntrega: deliveryMode.value === 'domicilio' ? form.value.horaEntrega : '',
       notasPedido: form.value.notasPedido,
+      suscriptorId: form.value.suscriptorId.trim() || null,
+      reclamoRecompensa: cartItems.value.some(item => item.precio === 0 && welcomeData.value?.recompensaAñadida),
       productos: cartItems.value.map(item => ({
         id: item.id,
         nombre: item.nombre,

@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
-import { sendSubscriberEmail } from './mailer.js';
+import { sendSubscriberEmail, sendRewardEmail } from './mailer.js';
 
 dotenv.config();
 
@@ -60,6 +60,29 @@ const createOrdenesTable = async () => {
   }
 };
 createOrdenesTable();
+
+// Crear tabla de horarios semanales si no existe
+const createHorariosSemanalesTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS horarios_semanales (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+        dia_semana SMALLINT NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
+        tipo VARCHAR(20) NOT NULL DEFAULT 'laboral',
+        hora_entrada TIME,
+        hora_salida TIME,
+        created_at TIMESTAMP DEFAULT now(),
+        edited_at TIMESTAMP,
+        UNIQUE (usuario_id, dia_semana)
+      );
+    `);
+    console.log("✅ Tabla 'horarios_semanales' verificada en la base de datos.");
+  } catch (err) {
+    console.error("❌ Error al crear la tabla 'horarios_semanales':", err);
+  }
+};
+createHorariosSemanalesTable();
 
 // ── UPLOAD DE IMAGENES ────────────────────────────────────
 
@@ -1435,7 +1458,58 @@ app.post('/api/checador/registro', async (req, res) => {
       }
     }
 
-    // 4. Registrar Asistencia (el TIMESTAMP lo pone la base de datos)
+    // 4. Validar horario semanal — fuente de verdad única
+    // Calcular día de semana actual en zona horaria local del servidor (0=Lun … 6=Dom)
+    const ahora = new Date();
+    const diaSemanaJS = ahora.getDay(); // 0=Dom, 1=Lun, …, 6=Sáb
+    const diaSemanaDB = diaSemanaJS === 0 ? 6 : diaSemanaJS - 1; // 0=Lun … 6=Dom
+
+    const horarioRes = await pool.query(
+      `SELECT tipo, hora_entrada, hora_salida
+       FROM horarios_semanales
+       WHERE usuario_id = $1 AND dia_semana = $2`,
+      [usuarioId, diaSemanaDB]
+    );
+
+    if (!horarioRes.rows.length) {
+      return res.status(403).json({
+        error: 'No tienes un turno programado para hoy. Contacta a tu administrador.'
+      });
+    }
+
+    const horario = horarioRes.rows[0];
+
+    if (horario.tipo === 'descanso') {
+      return res.status(403).json({
+        error: 'Hoy es tu día de descanso. No puedes registrar asistencia.'
+      });
+    }
+
+    // Solo validar ventana de tiempo para Entrada
+    if (tipo === 'Entrada' && horario.hora_entrada) {
+      // hora_entrada viene como "HH:MM:SS" o "HH:MM" desde PostgreSQL TIME
+      const [hh, mm] = horario.hora_entrada.toString().split(':').map(Number);
+
+      // Construir fecha/hora de inicio de turno (hoy a hh:mm)
+      const inicioTurno = new Date(ahora);
+      inicioTurno.setHours(hh, mm, 0, 0);
+
+      // Límite mínimo: 15 minutos ANTES del inicio de turno
+      const limiteMinimo = new Date(inicioTurno.getTime() - 15 * 60 * 1000);
+
+      if (ahora < limiteMinimo) {
+        // Formatear la hora mínima para el mensaje
+        const hMin = String(limiteMinimo.getHours()).padStart(2, '0');
+        const mMin = String(limiteMinimo.getMinutes()).padStart(2, '0');
+        const hTurno = String(hh).padStart(2, '0');
+        const mTurno = String(mm).padStart(2, '0');
+        return res.status(403).json({
+          error: `Aún es muy temprano. Tu turno inicia a las ${hTurno}:${mTurno}. Puedes checar a partir de las ${hMin}:${mMin}.`
+        });
+      }
+    }
+
+    // 5. Registrar Asistencia (el TIMESTAMP lo pone la base de datos)
     const { rows } = await pool.query(
       `INSERT INTO asistencias (usuario_id, tipo, latitud, longitud, distancia_metros)
        VALUES ($1, $2, $3, $4, $5)
@@ -1449,6 +1523,7 @@ app.post('/api/checador/registro', async (req, res) => {
     res.status(500).json({ error: 'Error al procesar el registro de asistencia' });
   }
 });
+
 
 // GET /api/checador/historial — Obtener historial de asistencias
 app.get('/api/checador/historial', async (req, res) => {
@@ -1525,32 +1600,40 @@ app.get('/api/nomina', async (req, res) => {
       let horaExacta = null;
       let horaExactaSalida = null;
 
-      // Usar la fecha actual (si la busqueda es de hoy) o la fecha del reporte para comparar
       const horaEntradaDate = new Date(`${fecha}T${row.hora_entrada}:00`);
-      const limitPuntual = new Date(horaEntradaDate.getTime() + 15 * 60000);
+
+      // Ventanas de tiempo relativas a hora_entrada
+      const ventanaPuntualMin  = new Date(horaEntradaDate.getTime() -  5 * 60000); // -5 min
+      const ventanaPuntualMax  = new Date(horaEntradaDate.getTime() +  5 * 60000); // +5 min
+      const ventanaRetardoMax  = new Date(horaEntradaDate.getTime() + 15 * 60000); // +15 min
+      const ventanaFalta       = new Date(horaEntradaDate.getTime() + 2 * 3600000); // +2 h
 
       if (row.hora_real_salida) {
         const horaRealS = new Date(row.hora_real_salida);
-        horaExactaSalida = horaRealS.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+        horaExactaSalida = horaRealS.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
       }
 
       if (row.hora_real_entrada) {
+        // El empleado YA checó → calcular puntualidad
         const horaReal = new Date(row.hora_real_entrada);
-        horaExacta = horaReal.toLocaleTimeString('es-MX', { hour: '2-digit', minute:'2-digit' });
+        horaExacta = horaReal.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
-        if (horaReal <= limitPuntual) {
-          estado = 'puntual';
+        if (horaReal >= ventanaPuntualMin && horaReal <= ventanaPuntualMax) {
+          estado = 'puntual';        // checó dentro de ±5 min
+        } else if (horaReal > ventanaPuntualMax && horaReal <= ventanaRetardoMax) {
+          estado = 'retardo';        // checó entre 5 y 15 min tarde
+        } else if (horaReal > ventanaRetardoMax) {
+          estado = 'retardo_grave';  // checó más de 15 min tarde
         } else {
-          estado = 'tarde';
+          // Llegó antes de la ventana puntual mínima (muy temprano, el checador ya lo controla)
+          estado = 'puntual';
         }
       } else {
-        // No ha checado
-        // Si estamos viendo una fecha pasada, asume falta (si now es de un dia despues)
-        // Para simplificar, comparamos si "now" ya superó la hora de entrada de ESE día
-        if (now > horaEntradaDate) {
-          estado = 'falta';
+        // El empleado NO ha checado → evaluar por tiempo actual
+        if (now >= ventanaFalta) {
+          estado = 'falta';      // pasaron 2+ horas sin checar
         } else {
-          estado = 'pendiente';
+          estado = 'pendiente';  // aún no es su turno o tiene tiempo
         }
       }
 
@@ -1569,24 +1652,114 @@ app.get('/api/nomina', async (req, res) => {
   }
 });
 
-// POST /api/nomina
+// POST /api/nomina — acepta un registro o un array de registros (fechas múltiples)
 app.post('/api/nomina', async (req, res) => {
-  const { usuario_id, rol, hora_entrada, hora_salida, fecha } = req.body;
+  // Soporte para payload único o array
+  const payload = req.body;
+  const registros = Array.isArray(payload) ? payload : [payload];
 
-  if (!usuario_id || !hora_entrada || !hora_salida || !fecha) {
-    return res.status(400).json({ error: 'Faltan datos requeridos' });
+  if (!registros.length) {
+    return res.status(400).json({ error: 'Se requiere al menos un registro' });
   }
 
+  // Validar cada registro
+  for (const r of registros) {
+    if (!r.usuario_id || !r.hora_entrada || !r.hora_salida || !r.fecha) {
+      return res.status(400).json({ error: 'Faltan datos requeridos en uno o más registros' });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const insertados = [];
+    for (const r of registros) {
+      // Evitar duplicados: si ya existe un registro para ese usuario y fecha, se omite
+      const existing = await client.query(
+        `SELECT id FROM nomina WHERE usuario_id = $1 AND fecha = $2`,
+        [r.usuario_id, r.fecha]
+      );
+      if (existing.rows.length > 0) continue;
+
+      const { rows } = await client.query(
+        `INSERT INTO nomina (usuario_id, rol, hora_entrada, hora_salida, fecha)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [r.usuario_id, r.rol || 'N/A', r.hora_entrada, r.hora_salida, r.fecha]
+      );
+      insertados.push(rows[0]);
+    }
+    await client.query('COMMIT');
+    res.status(201).json(insertados);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Error al crear registros en nómina' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── HORARIOS SEMANALES ────────────────────────────────────
+
+// GET /api/horarios-semanales/:usuario_id
+app.get('/api/horarios-semanales/:usuario_id', async (req, res) => {
+  const { usuario_id } = req.params;
   try {
     const { rows } = await pool.query(
-      `INSERT INTO nomina (usuario_id, rol, hora_entrada, hora_salida, fecha)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [usuario_id, rol, hora_entrada, hora_salida, fecha]
+      `SELECT
+         dia_semana,
+         tipo,
+         TO_CHAR(hora_entrada, 'HH24:MI') as hora_entrada,
+         TO_CHAR(hora_salida,  'HH24:MI') as hora_salida
+       FROM horarios_semanales
+       WHERE usuario_id = $1
+       ORDER BY dia_semana ASC`,
+      [usuario_id]
     );
-    res.status(201).json(rows[0]);
+    res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al crear el registro en nómina' });
+    res.status(500).json({ error: 'Error al obtener horario semanal' });
+  }
+});
+
+// PUT /api/horarios-semanales/:usuario_id — reemplaza el horario semanal completo
+app.put('/api/horarios-semanales/:usuario_id', async (req, res) => {
+  const { usuario_id } = req.params;
+  const { dias } = req.body; // Array of { dia_semana, tipo, hora_entrada, hora_salida }
+
+  if (!Array.isArray(dias)) {
+    return res.status(400).json({ error: 'Se requiere un array de días' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Eliminar el horario anterior del usuario
+    await client.query(`DELETE FROM horarios_semanales WHERE usuario_id = $1`, [usuario_id]);
+    // Insertar los nuevos
+    for (const d of dias) {
+      if (d.dia_semana === undefined || d.dia_semana === null) continue;
+      await client.query(
+        `INSERT INTO horarios_semanales (usuario_id, dia_semana, tipo, hora_entrada, hora_salida)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          usuario_id,
+          d.dia_semana,
+          d.tipo || 'laboral',
+          d.tipo === 'descanso' ? null : (d.hora_entrada || null),
+          d.tipo === 'descanso' ? null : (d.hora_salida  || null)
+        ]
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ message: 'Horario semanal guardado correctamente' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar horario semanal' });
+  } finally {
+    client.release();
   }
 });
 
@@ -1789,7 +1962,7 @@ app.post('/api/ordenes', async (req, res) => {
     clienteNombre, clienteTelefono, clienteEmail, 
     clienteDireccion, clienteReferencias, pagoMetodo, 
     tipoEntrega, total, costoEnvio, productos, usuarioCobro,
-    horaEntrega, notasPedido 
+    horaEntrega, notasPedido, suscriptorId
   } = req.body;
 
   if (!clienteNombre || !clienteTelefono || !productos || !Array.isArray(productos)) {
@@ -1836,6 +2009,36 @@ app.post('/api/ordenes', async (req, res) => {
       horaEntrega || null,
       notasPedido || null
     ]);
+
+    // Lógica de Lealtad (Atada a la creación de la orden de forma segura)
+    if (suscriptorId) {
+      const checkQuery = 'SELECT * FROM suscriptores WHERE id = $1';
+      const checkRes = await client.query(checkQuery, [suscriptorId]);
+      
+      if (checkRes.rows.length > 0) {
+        const sub = checkRes.rows[0];
+        const nuevosPedidos = (sub.pedidos_lealtad || 0) + 1;
+        
+        const updateQuery = 'UPDATE suscriptores SET pedidos_lealtad = $1 WHERE id = $2 RETURNING *';
+        await client.query(updateQuery, [nuevosPedidos, suscriptorId]);
+        
+        // Si hay reclamo de recompensa en esta orden, incrementamos el contador
+        if (req.body.reclamoRecompensa) {
+          const updateRecompensaQuery = 'UPDATE suscriptores SET recompensas_reclamadas = COALESCE(recompensas_reclamadas, 0) + 1 WHERE id = $1';
+          await client.query(updateRecompensaQuery, [suscriptorId]);
+        }
+        
+        // Si llega a un múltiplo de 10, enviar correo (fuera de la tx principal si es lento, pero lo enviamos aquí)
+        if (nuevosPedidos > 0 && nuevosPedidos % 10 === 0 && sub.correo) {
+          try {
+            // Requiere que sendRewardEmail esté importado/definido
+            await sendRewardEmail(sub.correo, sub.nombre, sub.id);
+          } catch (e) {
+            console.error("Error al enviar correo de recompensa:", e);
+          }
+        }
+      }
+    }
 
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
@@ -2245,6 +2448,92 @@ app.delete('/api/suscriptores/:id', async (req, res) => {
   } catch (err) {
     console.error('Error al eliminar suscriptor:', err);
     res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// (El endpoint POST /api/suscriptores/:id/lealtad fue eliminado para robustecer el backend; ahora los puntos se suman exclusivamente en POST /api/ordenes)
+
+// POST /api/suscriptores/:id/reclamar - Reclamar recompensa (incrementa reclamadas)
+app.post('/api/suscriptores/:id/reclamar', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const checkQuery = 'SELECT * FROM suscriptores WHERE id = $1';
+    const checkRes = await pool.query(checkQuery, [id]);
+    if (checkRes.rows.length === 0) return res.status(404).json({ error: 'Suscriptor no encontrado' });
+    
+    const sub = checkRes.rows[0];
+    const recompensasGanadas = Math.floor((sub.pedidos_lealtad || 0) / 10);
+    const recompensasDisponibles = recompensasGanadas - (sub.recompensas_reclamadas || 0);
+    
+    if (recompensasDisponibles <= 0) {
+      return res.status(400).json({ error: 'No hay recompensas disponibles para reclamar.' });
+    }
+    
+    const nuevasReclamadas = (sub.recompensas_reclamadas || 0) + 1;
+    
+    const updateQuery = 'UPDATE suscriptores SET recompensas_reclamadas = $1 WHERE id = $2 RETURNING *';
+    const updated = await pool.query(updateQuery, [nuevasReclamadas, id]);
+    
+    res.json(updated.rows[0]);
+  } catch (err) {
+    console.error('Error al reclamar recompensa:', err);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /api/recompensa/canjear — El POS llama esto al escanear el QR "BAMBUREWARD-{id}"
+// Válida, consume la recompensa y reinicia el contador automáticamente
+app.post('/api/recompensa/canjear', async (req, res) => {
+  const { qr } = req.body;
+
+  if (!qr || !qr.startsWith('BAMBUREWARD-')) {
+    return res.status(400).json({ error: 'Código QR de recompensa inválido.' });
+  }
+
+  // Extraer el ID del suscriptor del QR
+  const suscriptorId = qr.replace('BAMBUREWARD-', '').trim();
+
+  try {
+    const checkRes = await pool.query('SELECT * FROM suscriptores WHERE id = $1', [suscriptorId]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'No se encontró ningún suscriptor con este código.' });
+    }
+
+    const sub = checkRes.rows[0];
+    const recompensasGanadas = Math.floor((sub.pedidos_lealtad || 0) / 10);
+    const recompensasDisponibles = recompensasGanadas - (sub.recompensas_reclamadas || 0);
+
+    if (recompensasDisponibles <= 0) {
+      return res.status(400).json({
+        error: `Este cliente aún no tiene recompensas disponibles. Lleva ${sub.pedidos_lealtad % 10}/10 pedidos en su camino actual.`
+      });
+    }
+
+    // Consumir la recompensa — el camino se reinicia automáticamente por la lógica matemática
+    const nuevasReclamadas = (sub.recompensas_reclamadas || 0) + 1;
+    const updated = await pool.query(
+      'UPDATE suscriptores SET recompensas_reclamadas = $1 WHERE id = $2 RETURNING *',
+      [nuevasReclamadas, suscriptorId]
+    );
+
+    const subActualizado = updated.rows[0];
+    const progresoNuevo = subActualizado.pedidos_lealtad % 10;
+
+    res.json({
+      success: true,
+      mensaje: `¡Recompensa canjeada exitosamente! El camino de ${sub.nombre} se reinicia en ${progresoNuevo}/10.`,
+      suscriptor: {
+        id: subActualizado.id,
+        nombre: subActualizado.nombre,
+        pedidos_lealtad: subActualizado.pedidos_lealtad,
+        recompensas_reclamadas: subActualizado.recompensas_reclamadas,
+        progreso_actual: progresoNuevo,
+        recompensas_disponibles: Math.floor(subActualizado.pedidos_lealtad / 10) - subActualizado.recompensas_reclamadas
+      }
+    });
+  } catch (err) {
+    console.error('Error al canjear recompensa:', err);
+    res.status(500).json({ error: 'Error interno al procesar el canje.' });
   }
 });
 

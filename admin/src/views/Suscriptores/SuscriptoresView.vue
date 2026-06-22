@@ -52,13 +52,13 @@
                   <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ formatDate(sub.fecha_alta) }}</p>
                 </td>
                 <td class="px-5 py-4 text-center">
-                  <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
-                    {{ sub.pedidos || 0 }}
+                  <span @click.stop="verLealtad(sub)" class="inline-flex cursor-pointer hover:bg-teal-200 items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200 transition-colors">
+                    {{ sub.pedidos_lealtad || 0 }}
                   </span>
                 </td>
                 <td class="px-5 py-4">
                   <div class="flex items-center justify-center gap-3">
-                    <button @click="verPedidos(sub)" class="text-gray-400 hover:text-brand-500 transition-colors" title="Ver">
+                    <button @click="verLealtad(sub)" class="text-gray-400 hover:text-brand-500 transition-colors" title="Ver Lealtad">
                       <EyeIcon class="w-5 h-5" />
                     </button>
                     <button @click="openEditModal(sub)" class="text-gray-400 hover:text-brand-500 transition-colors" title="Editar">
@@ -77,49 +77,70 @@
     </div>
   </AdminLayout>
 
-  <!-- Modal Ver Pedidos -->
+  <!-- Modal Lealtad (Vertical Timeline) -->
   <Modal v-if="isViewModalOpen" :fullScreenBackdrop="true" @close="isViewModalOpen = false">
     <template #body>
-      <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col border border-gray-200 dark:border-gray-700 mx-4">
-        <!-- Header -->
-        <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/30 rounded-t-2xl">
+      <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col mx-4 overflow-hidden animate-modal-in border-t-8 border-[#197B4F]">
+        <div class="p-6 flex justify-between items-start">
           <div>
-            <h3 class="text-lg font-bold text-gray-800 dark:text-white">Pedidos Recientes</h3>
-            <p class="text-sm text-gray-500 mt-0.5">{{ selectedSub?.nombre }}</p>
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1">PROGRAMA DE LEALTAD</p>
+            <h3 class="text-2xl font-black text-gray-800 dark:text-white">{{ selectedSub?.nombre }}</h3>
+            <p class="text-sm text-gray-500 mt-1">Total Histórico: {{ selectedSub?.pedidos_lealtad || 0 }} pedidos</p>
           </div>
-          <button @click="isViewModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          <button @click="isViewModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors bg-gray-100 dark:bg-gray-800 rounded-full p-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
-        <!-- Body -->
-        <div class="p-5 overflow-y-auto max-h-[60vh] custom-scrollbar">
-          <ul class="space-y-4">
-            <!-- Dummy orders -->
-            <li class="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-semibold text-gray-800 dark:text-gray-200">#ORD-1023</span>
-                <span class="text-sm font-medium text-gray-500">Hoy 09:30 AM</span>
+        
+        <div class="px-8 pb-8 pt-2 overflow-y-auto max-h-[60vh] custom-scrollbar">
+          
+          <div v-if="recompensaDisponible" class="mb-8 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-full bg-[#197B4F] flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
               </div>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">1x Café Americano, 1x Pan Tostado</p>
-              <div class="text-right font-bold text-emerald-600 dark:text-emerald-400">$65.00</div>
-            </li>
-            <li class="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-semibold text-gray-800 dark:text-gray-200">#ORD-0985</span>
-                <span class="text-sm font-medium text-gray-500">Ayer 10:15 AM</span>
+              <div>
+                <h4 class="text-[#197B4F] font-bold text-lg leading-tight">¡Recompensa Lista!</h4>
+                <p class="text-sm text-green-700 dark:text-green-400">10 pedidos completados exitosamente.</p>
               </div>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">2x Jugo Verde, 1x Huevos Motuleños</p>
-              <div class="text-right font-bold text-emerald-600 dark:text-emerald-400">$210.00</div>
-            </li>
-            <li class="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-semibold text-gray-800 dark:text-gray-200">#ORD-0940</span>
-                <span class="text-sm font-medium text-gray-500">Hace 3 días</span>
+            </div>
+            <button @click="reclamarRecompensa" class="w-full py-2.5 rounded-lg bg-[#197B4F] text-white font-bold hover:bg-[#146342] transition-colors shadow-md disabled:opacity-50" :disabled="isClaiming">
+              {{ isClaiming ? 'Procesando...' : 'Reclamar Recompensa' }}
+            </button>
+          </div>
+
+          <!-- Timeline -->
+          <div class="relative pl-6 border-l-2 border-[#197B4F] ml-4 mt-2 mb-4 space-y-8">
+            
+            <div v-for="n in 10" :key="n" class="relative">
+              <!-- Circle -->
+              <div class="absolute -left-[35px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900"
+                   :class="((selectedSub?.pedidos_lealtad || 0) % 10 >= n || recompensaDisponible) ? 'bg-[#197B4F]' : 'bg-gray-200 dark:bg-gray-700'">
+                <svg v-if="((selectedSub?.pedidos_lealtad || 0) % 10 >= n || recompensaDisponible)" class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                </svg>
               </div>
-              <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">1x Chilaquiles Verdes</p>
-              <div class="text-right font-bold text-emerald-600 dark:text-emerald-400">$120.00</div>
-            </li>
-          </ul>
+              
+              <!-- Content -->
+              <div class="pl-2">
+                <h4 class="font-bold text-[15px]" 
+                    :class="((selectedSub?.pedidos_lealtad || 0) % 10 >= n || recompensaDisponible) ? 'text-[#197B4F] dark:text-green-400' : 'text-gray-500 dark:text-gray-400'">
+                  <span v-if="n === 10">Recompensa</span>
+                  <span v-else>Pedido {{ n }}</span>
+                </h4>
+                <p class="text-sm text-gray-500 mt-0.5">
+                  <span v-if="((selectedSub?.pedidos_lealtad || 0) % 10 >= n || recompensaDisponible)">
+                    Registrado exitosamente.
+                  </span>
+                  <span v-else>
+                    Pendiente de compra.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+          </div>
+          
         </div>
       </div>
     </template>
@@ -219,9 +240,44 @@ const formatDate = (dateString: string) => {
 const isViewModalOpen = ref(false);
 const selectedSub = ref<any>(null);
 
-const verPedidos = (sub: any) => {
+const recompensaDisponible = computed(() => {
+  if (!selectedSub.value) return false;
+  const pedidos = selectedSub.value.pedidos_lealtad || 0;
+  const reclamadas = selectedSub.value.recompensas_reclamadas || 0;
+  return Math.floor(pedidos / 10) > reclamadas;
+});
+
+const isClaiming = ref(false);
+
+const verLealtad = (sub: any) => {
   selectedSub.value = sub;
   isViewModalOpen.value = true;
+};
+
+const reclamarRecompensa = async () => {
+  if (!selectedSub.value) return;
+  isClaiming.value = true;
+  try {
+    const qr = `BAMBUREWARD-${selectedSub.value.id}`;
+    const res = await fetch('/api/recompensa/canjear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qr })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      selectedSub.value = data.suscriptor;
+      const index = suscriptores.value.findIndex(s => s.id === data.suscriptor.id);
+      if (index !== -1) suscriptores.value[index] = { ...suscriptores.value[index], ...data.suscriptor };
+    } else {
+      alert(data.error || 'Error al reclamar recompensa.');
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Error de conexión al reclamar.');
+  } finally {
+    isClaiming.value = false;
+  }
 };
 // Estado del Modal de Agregar/Editar
 const isFormModalOpen = ref(false);

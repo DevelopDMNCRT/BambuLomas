@@ -145,3 +145,58 @@ export const sendSubscriberEmail = async (correo, nombre, id) => {
     return false;
   }
 };
+
+export const sendRewardEmail = async (correo, nombre, id) => {
+  try {
+    const qrData = `BAMBUREWARD-${id}`;
+    
+    // Generar Buffer del QR
+    const qrBuffer = await QRCode.toBuffer(qrData, {
+      color: { dark: '#10B981', light: '#FFFFFF' }, // Verde esmeralda para recompensas
+      width: 250,
+      margin: 1
+    });
+
+    const attachments = [
+      {
+        filename: 'reward-qr.png',
+        content: qrBuffer,
+        cid: 'rewardqr'
+      }
+    ];
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM,
+      to: correo,
+      subject: '¡Felicidades! Tienes una recompensa en Bambú Lomas 🎁',
+      html: `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
+          <div style="background-color: #10B981; padding: 30px 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px;">¡Tu Lealtad tiene Premio!</h1>
+          </div>
+          <div style="padding: 40px 30px; text-align: center;">
+            <h2 style="color: #1f2937; margin-bottom: 15px; font-size: 22px;">¡Lograste 10 pedidos, ${nombre}!</h2>
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+              Como agradecimiento por tu preferencia, te hemos regalado un producto especial en tu próxima visita o pedido web.
+              Muestra este código QR o usa tu ID para reclamar tu recompensa.
+            </p>
+            
+            <div style="background-color: #ffffff; border: 2px dashed #10B981; border-radius: 12px; padding: 25px; margin: 30px auto; max-width: 300px;">
+              <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-top: 0;">Tu código de recompensa</p>
+              <img src="cid:rewardqr" alt="QR Recompensa" style="width: 100%; max-width: 200px; height: auto; margin: 15px 0; border-radius: 8px;" />
+              <p style="color: #1f2937; font-size: 18px; font-weight: bold; margin: 0; font-family: monospace;">${id}</p>
+            </div>
+          </div>
+        </div>
+      `,
+      attachments
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Reward Email sent: %s', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending reward email:', error);
+    return false;
+  }
+};

@@ -14,6 +14,13 @@ export interface NominaRegistro {
   horaExactaSalida: string | null;
 }
 
+export interface DiaSemana {
+  dia_semana: number; // 0=Lun, 1=Mar, ..., 6=Dom
+  tipo: 'laboral' | 'descanso';
+  hora_entrada: string | null;
+  hora_salida: string | null;
+}
+
 export function useNomina() {
   const nominas = ref<NominaRegistro[]>([]);
   const loading = ref(false);
@@ -37,7 +44,13 @@ export function useNomina() {
     }
   };
 
-  const createNomina = async (payload: { usuario_id: number, rol: string, hora_entrada: string, hora_salida: string, fecha: string }) => {
+  /**
+   * Crea uno o múltiples registros en nómina.
+   * Acepta un array de { usuario_id, rol, hora_entrada, hora_salida, fecha }
+   */
+  const createNomina = async (
+    payload: { usuario_id: number; rol: string; hora_entrada: string; hora_salida: string; fecha: string }[]
+  ) => {
     try {
       const res = await fetch('/api/nomina', {
         method: 'POST',
@@ -49,10 +62,46 @@ export function useNomina() {
         throw new Error(err.error || 'Error al guardar la nómina');
       }
       const data = await res.json();
-      await fetchNominas(payload.fecha);
+      // Refresh usando la fecha del primer registro
+      if (payload.length > 0) {
+        await fetchNominas(payload[0].fecha);
+      }
       return { success: true, data };
     } catch (err: any) {
       console.error(err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  /**
+   * Obtiene el horario semanal guardado de un usuario.
+   */
+  const getHorarioSemanal = async (usuarioId: number): Promise<DiaSemana[]> => {
+    try {
+      const res = await fetch(`/api/horarios-semanales/${usuarioId}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  };
+
+  /**
+   * Guarda (reemplaza) el horario semanal completo de un usuario.
+   */
+  const saveHorarioSemanal = async (usuarioId: number, dias: DiaSemana[]) => {
+    try {
+      const res = await fetch(`/api/horarios-semanales/${usuarioId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dias }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al guardar el horario semanal');
+      }
+      return { success: true };
+    } catch (err: any) {
       return { success: false, error: err.message };
     }
   };
@@ -62,6 +111,8 @@ export function useNomina() {
     loading,
     error,
     fetchNominas,
-    createNomina
+    createNomina,
+    getHorarioSemanal,
+    saveHorarioSemanal,
   };
 }
