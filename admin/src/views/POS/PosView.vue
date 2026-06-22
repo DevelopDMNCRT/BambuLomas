@@ -23,6 +23,22 @@
           </div>
         </div>
 
+        <!-- Cliente Escaneado -->
+        <div v-if="clienteEscaneado" class="px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 border-b border-emerald-200 dark:border-emerald-500/20 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 leading-none">{{ clienteEscaneado.nombre }}</p>
+              <p class="text-[10px] text-emerald-600 dark:text-emerald-500 mt-0.5">ID: {{ clienteEscaneado.id }} · {{ clienteEscaneado.pedidos_lealtad || 0 }} pedidos</p>
+            </div>
+          </div>
+          <button @click="clienteEscaneado = null" class="text-emerald-500 hover:text-emerald-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
         <!-- Cart Items -->
         <div class="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
           <div v-if="cart.length === 0" class="flex flex-col items-center justify-center h-full text-gray-400">
@@ -97,12 +113,11 @@
                 <svg class="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               </div>
               <button
-                @click="showPrices = !showPrices"
-                :class="showPrices ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
-                class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all shrink-0"
-                title="Mostrar/Ocultar Precios"
+                @click="openQrScanner"
+                class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all shrink-0 bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600"
+                title="Escanear QR de cliente"
               >
-                $
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 3.5a.5.5 0 11-1 0 .5.5 0 011 0zM6.5 20a.5.5 0 11-1 0 .5.5 0 011 0zM6 4h2v2H6V4zm12 0h2v2h-2V4zM4 4h2v2H4V4z"/></svg>
               </button>
             </div>
           </div>
@@ -139,7 +154,7 @@
                   <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                   <!-- Price badge -->
-                  <div v-if="showPrices" class="absolute top-2 right-2 bg-black/70 backdrop-blur-md px-2.5 py-1.5 rounded-xl shadow-md border border-white/10">
+                  <div class="absolute top-2 right-2 bg-black/70 backdrop-blur-md px-2.5 py-1.5 rounded-xl shadow-md border border-white/10">
                     <span class="text-[13px] font-black text-white tracking-wide">{{ formatCurrency(platillo.precioBase) }}</span>
                   </div>
                </div>
@@ -336,6 +351,89 @@
       </div>
     </Teleport>
 
+    <!-- ═══ MODAL: QR Scanner ═══ -->
+    <Teleport to="body">
+      <div v-if="showQrModal" class="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+        <div class="absolute inset-0 custom-modal-backdrop" @click="closeQrScanner"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col border border-gray-200 dark:border-gray-700 animate-modal-in overflow-hidden">
+          <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+            <div>
+              <h3 class="text-lg font-bold text-gray-800 dark:text-white">Escanear QR de Cliente</h3>
+              <p class="text-sm text-gray-500 mt-0.5">Apunta la cámara al código QR del cliente</p>
+            </div>
+            <button @click="closeQrScanner" class="text-gray-400 hover:text-gray-600 transition-colors">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <!-- Visor de cámara -->
+          <div class="relative bg-black aspect-square">
+            <video ref="qrVideo" class="w-full h-full object-cover" autoplay playsinline muted></video>
+            <!-- Marco de escaneo -->
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-48 h-48 border-2 border-emerald-400 rounded-2xl relative">
+                <span class="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl"></span>
+                <span class="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl"></span>
+                <span class="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl"></span>
+                <span class="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br-xl"></span>
+              </div>
+            </div>
+            <div v-if="qrScanning" class="absolute bottom-3 left-0 right-0 text-center">
+              <span class="text-xs text-white/80 bg-black/50 px-3 py-1 rounded-full">Escaneando...</span>
+            </div>
+          </div>
+          <!-- Input manual -->
+          <div class="p-4">
+            <p class="text-xs text-gray-500 text-center mb-3">¿No tienes cámara? Ingresa el ID manualmente</p>
+            <div class="flex gap-2">
+              <input v-model="manualQrId" type="text" placeholder="ID del suscriptor (ej. 12345)" class="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-white outline-none focus:border-emerald-500" @keyup.enter="lookupManualId" />
+              <button @click="lookupManualId" :disabled="qrLookingUp" class="px-4 py-2 bg-emerald-500 text-white rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-colors disabled:opacity-60">
+                {{ qrLookingUp ? '...' : 'Buscar' }}
+              </button>
+            </div>
+            <p v-if="qrError" class="text-xs text-red-500 mt-2 text-center">{{ qrError }}</p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══ MODAL: Bienvenida Cliente ═══ -->
+    <Teleport to="body">
+      <div v-if="showWelcomeModal" class="fixed inset-0 z-[1000001] flex items-center justify-center p-4">
+        <div class="absolute inset-0 custom-modal-backdrop" @click="showWelcomeModal = false"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs border border-gray-200 dark:border-gray-700 animate-modal-in overflow-hidden text-center">
+          <!-- Header verde -->
+          <div class="bg-emerald-500 p-6">
+            <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <h3 class="text-xl font-black text-white">¡Bienvenido!</h3>
+            <p class="text-emerald-100 text-sm mt-1">Programa de Lealtad</p>
+          </div>
+          <div class="p-6">
+            <h4 class="text-2xl font-black text-gray-800 dark:text-white mb-1">{{ clienteEscaneado?.nombre }}</h4>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">ID: {{ clienteEscaneado?.id }}</p>
+            <!-- Progreso de lealtad -->
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-semibold text-gray-500">Camino de lealtad</span>
+                <span class="text-xs font-black text-emerald-600">{{ welcomeProgreso }}/10</span>
+              </div>
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                <div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" :style="{ width: (welcomeProgreso * 10) + '%' }"></div>
+              </div>
+              <p class="text-xs text-gray-500 mt-2">
+                {{ welcomeProgreso >= 10 ? '🎁 ¡Recompensa disponible!' : `Faltan ${10 - welcomeProgreso} pedidos para tu próxima recompensa` }}
+              </p>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">Total de pedidos con QR: <span class="font-bold text-gray-700 dark:text-gray-300">{{ clienteEscaneado?.pedidos_lealtad || 0 }}</span></p>
+            <button @click="showWelcomeModal = false" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-md active:scale-[0.98]">
+              Continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ═══ MODAL: Discount ═══ -->
     <Teleport to="body">
       <div v-if="showDiscountModal" class="fixed inset-0 z-[999999] flex items-center justify-center p-4">
@@ -375,6 +473,7 @@ import AdminLayout from '@/components/layout/AdminLayout.vue';
 import { useMesas } from '@/composables/useMesas';
 import { useCxc } from '@/composables/useCxc';
 import { useAuth } from '@/composables/useAuth';
+import jsQR from 'jsqr';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const route = useRoute();
@@ -390,7 +489,6 @@ const cxcClientName = ref<string | null>(null);
 const platillos = ref<any[]>([]);
 const loading = ref(true);
 const cart = ref<any[]>([]);
-const showPrices = ref(true);
 const activeCategoria = ref('Todos');
 const currentOrderNum = ref(1024);
 const searchQuery = ref('');
@@ -470,12 +568,23 @@ const hideCxcSearch = () => {
 
 // ── Categories ──
 const categorias = computed(() => {
-  const cats = new Set(platillos.value.map(p => p.categoria));
+  const visibleList = platillos.value.filter(p => !p.privado || p.categoria?.toLowerCase() === 'recompensa');
+  const cats = new Set(visibleList.map(p => p.categoria));
+  const userRole = getUser()?.rol?.toLowerCase() || '';
+  if (userRole !== 'admin') {
+     cats.delete('Recompensa');
+  }
   return ['Todos', ...Array.from(cats)].filter(Boolean);
 });
 
 const platillosFiltrados = computed(() => {
-  let list = platillos.value;
+  let list = platillos.value.filter(p => !p.privado || p.categoria?.toLowerCase() === 'recompensa');
+  const userRole = getUser()?.rol?.toLowerCase() || '';
+  
+  if (userRole !== 'admin') {
+    list = list.filter(p => p.categoria?.toLowerCase() !== 'recompensa');
+  }
+
   if (activeCategoria.value !== 'Todos') {
     list = list.filter(p => p.categoria === activeCategoria.value);
   }
@@ -494,7 +603,7 @@ const fetchPlatillos = async () => {
     const res = await fetch(`${API_URL}/api/platillos`);
     if (res.ok) {
       const data = await res.json();
-      platillos.value = data.filter((p: any) => !p.privado);
+      platillos.value = data;
     }
   } catch (e) {
     console.error('Error al cargar platillos:', e);
@@ -873,24 +982,27 @@ const processPayment = async () => {
     if (cxcClientName.value) {
       // Liquidar deuda en backend
       await payCxcDebt(cxcClientName.value, method?.label || 'Efectivo');
-    } else if (paymentData.value.method === 'cxc') {
-      // Registrar nueva deuda CXC en backend
+    } else {
+      const hasReward = cart.value.some(c => c.platillo?.categoria?.toLowerCase() === 'recompensa');
+      // Registrar orden en backend
       await fetch(`${API_URL}/api/ordenes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clienteNombre: paymentData.value.clientName.trim().toUpperCase(),
-          clienteTelefono: 'N/A', // Campo requerido en la bd por defecto
-          clienteEmail: '',
+          clienteNombre: clienteEscaneado.value?.nombre?.toUpperCase() || paymentData.value.clientName.trim().toUpperCase() || 'PÚBLICO EN GENERAL',
+          clienteTelefono: clienteEscaneado.value?.numero || 'N/A',
+          clienteEmail: clienteEscaneado.value?.correo || '',
           clienteDireccion: '',
-          clienteReferencias: 'POS CXC',
-          pagoMetodo: 'CXC',
+          clienteReferencias: paymentData.value.method === 'cxc' ? 'POS CXC' : 'POS',
+          pagoMetodo: method?.label || 'Efectivo',
           tipoEntrega: 'local',
           total: subtotal.value,
           costoEnvio: 0,
           estado: 'Completada',
           notas_pedido: discount.value.amount > 0 ? `Descuento aplicado: -$${discount.value.amount} (${discount.value.reason})` : '',
           usuarioCobro: getUser()?.nombre || (getUser() as any)?.usuario || 'Desconocido',
+          suscriptorId: clienteEscaneado.value?.id || null,
+          reclamoRecompensa: hasReward,
           productos: cart.value.map(c => ({
             id: c.platillo.id,
             producto: c.platillo.nombre,
@@ -905,7 +1017,7 @@ const processPayment = async () => {
     
     confirmedOrder.value = {
       orderNum: currentOrderNum.value,
-      clientName: cxcClientName.value || paymentData.value.clientName || '',
+      clientName: cxcClientName.value || clienteEscaneado.value?.nombre || paymentData.value.clientName || '',
       methodLabel: method?.label || '',
       total: subtotal.value
     };
@@ -922,6 +1034,7 @@ const closeConfirmationModal = () => {
   showConfirmationModal.value = false;
   cart.value = [];
   discount.value = { amount: 0, reason: '' };
+  clienteEscaneado.value = null; // Limpiar el cliente
   currentOrderNum.value++;
   
   if (cxcClientName.value) {
@@ -931,6 +1044,152 @@ const closeConfirmationModal = () => {
     router.push('/mesas');
   }
 };
+
+// ── QR Scanner ──────────────────────────────────────────────────────────────
+const showQrModal = ref(false);
+const showWelcomeModal = ref(false);
+const clienteEscaneado = ref<any>(null);
+const qrVideo = ref<HTMLVideoElement | null>(null);
+const qrScanning = ref(false);
+const manualQrId = ref('');
+const qrError = ref('');
+const qrLookingUp = ref(false);
+let qrStream: MediaStream | null = null;
+let qrAnimFrame: number | null = null;
+
+const welcomeProgreso = computed(() => {
+  if (!clienteEscaneado.value) return 0;
+  const pedidos = clienteEscaneado.value.pedidos_lealtad || 0;
+  const reclamadas = clienteEscaneado.value.recompensas_reclamadas || 0;
+  const ganadas = Math.floor(pedidos / 10);
+  const disponibles = ganadas - reclamadas;
+  if (disponibles > 0) return 10;
+  return pedidos % 10;
+});
+
+const lookupSuscriptorById = async (rawId: string) => {
+  let id = String(rawId).trim();
+  if (id.startsWith('BAMBUSUB-')) id = id.replace('BAMBUSUB-', '');
+  if (id.startsWith('BAMBUREWARD-')) id = id.replace('BAMBUREWARD-', '');
+
+  qrError.value = '';
+  qrLookingUp.value = true;
+  try {
+    const res = await fetch(`/api/suscriptores`);
+    if (!res.ok) throw new Error('Error al buscar cliente');
+    const subs: any[] = await res.json();
+    const found = subs.find(s => String(s.id).trim() === id);
+    if (!found) {
+      qrError.value = `No se encontró un cliente con ID: ${id}`;
+      return;
+    }
+    clienteEscaneado.value = found;
+    
+    // Auto-add reward if available
+    const recompensasDisponibles = Math.floor((found.pedidos_lealtad || 0) / 10) - (found.recompensas_reclamadas || 0);
+    if (recompensasDisponibles > 0) {
+      const rewardProduct = platillos.value.find(p => p.categoria?.toLowerCase() === 'recompensa');
+      if (rewardProduct) {
+        cart.value.push({
+          platillo: rewardProduct,
+          cantidad: 1,
+          precioBase: 0,
+          precioExtra: 0,
+          extras: {}
+        });
+        // We'll let them know it was added via an alert or they'll just see the Welcome Modal
+      }
+    }
+    
+    closeQrScanner();
+    showWelcomeModal.value = true;
+  } catch (e) {
+    qrError.value = 'Error al conectar con el servidor';
+  } finally {
+    qrLookingUp.value = false;
+  }
+};
+
+const lookupManualId = () => {
+  const id = manualQrId.value.trim();
+  if (!id) return;
+  lookupSuscriptorById(id);
+};
+
+const startCameraScanner = async () => {
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    if (qrVideo.value) {
+      qrVideo.value.srcObject = qrStream;
+      // Need to wait for video to play before scanning
+      qrVideo.value.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
+      qrVideo.value.play();
+    }
+    qrScanning.value = true;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const scan = async () => {
+      if (!showQrModal.value || !qrScanning.value) return;
+      
+      if (qrVideo.value && qrVideo.value.readyState === qrVideo.value.HAVE_ENOUGH_DATA && ctx) {
+        canvas.height = qrVideo.value.videoHeight;
+        canvas.width = qrVideo.value.videoWidth;
+        ctx.drawImage(qrVideo.value, 0, 0, canvas.width, canvas.height);
+        
+        try {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+          
+          if (code) {
+            await lookupSuscriptorById(code.data);
+            return; // Stop scanning after success
+          }
+        } catch (_) { /* continue scanning */ }
+      }
+      qrAnimFrame = requestAnimationFrame(scan);
+    };
+    
+    // Start loop
+    qrAnimFrame = requestAnimationFrame(scan);
+    
+  } catch (err) {
+    qrError.value = 'No se pudo acceder a la cámara. Usa el campo manual.';
+    qrScanning.value = false;
+  }
+};
+
+const stopCamera = () => {
+  if (qrAnimFrame !== null) {
+    cancelAnimationFrame(qrAnimFrame);
+    qrAnimFrame = null;
+  }
+  if (qrStream) {
+    qrStream.getTracks().forEach(t => t.stop());
+    qrStream = null;
+  }
+  qrScanning.value = false;
+};
+
+const openQrScanner = async () => {
+  qrError.value = '';
+  manualQrId.value = '';
+  showQrModal.value = true;
+  // Wait for DOM then start camera
+  await new Promise(r => setTimeout(r, 100));
+  startCameraScanner();
+};
+
+const closeQrScanner = () => {
+  stopCamera();
+  showQrModal.value = false;
+};
+
 </script>
 
 <style scoped>
