@@ -157,10 +157,12 @@ import { useCompras, type CompraItem } from '@/composables/useCompras';
 
 const route = useRoute();
 const router = useRouter();
-const { create, update, getOne } = useCompras();
+const { create, update, getOne, getByFactura } = useCompras();
 
 const mode = ref(route.query.mode || 'add'); // 'add', 'edit', 'view'
 const compraId = ref<number | null>(route.query.id ? Number(route.query.id) : null);
+const facturaQuery = ref<string | null>(route.query.factura as string || null);
+const fromHistorial = ref(!!route.query.factura && !route.query.id);
 const loading = ref(false);
 const saving = ref(false);
 const apiError = ref('');
@@ -216,21 +218,26 @@ const removeItemRow = (index: number) => {
 
 onMounted(async () => {
   if (mode.value === 'edit' || mode.value === 'view') {
-    if (compraId.value) {
-      loading.value = true;
-      apiError.value = '';
-      try {
-        const fullCompra = await getOne(compraId.value);
+    loading.value = true;
+    apiError.value = '';
+    try {
+      let fullCompra;
+      if (compraId.value) {
+        fullCompra = await getOne(compraId.value);
+      } else if (facturaQuery.value) {
+        fullCompra = await getByFactura(facturaQuery.value);
+      }
+      if (fullCompra) {
         formData.factura = fullCompra.factura;
         formData.fecha = fullCompra.fecha;
         formData.proveedor = fullCompra.proveedor;
         formData.formaPago = fullCompra.formaPago || 'EFE';
         formData.items = fullCompra.items || [];
-      } catch (e: any) {
-        apiError.value = e.message || 'Error al obtener los detalles de la compra';
-      } finally {
-        loading.value = false;
       }
+    } catch (e: any) {
+      apiError.value = e.message || 'Error al obtener los detalles de la compra';
+    } finally {
+      loading.value = false;
     }
   } else if (mode.value === 'add' && route.query.source === 'xml') {
     // Si viene de una importación XML, recuperamos la información pre-cargada
@@ -258,7 +265,11 @@ onMounted(async () => {
 });
 
 const goBack = () => {
-  router.push('/compras');
+  if (fromHistorial.value) {
+    router.back();
+  } else {
+    router.push('/compras');
+  }
 };
 
 const saveCompra = async () => {

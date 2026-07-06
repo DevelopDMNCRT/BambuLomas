@@ -45,6 +45,12 @@ export function useCompras() {
     return res.json();
   };
 
+  const getByFactura = async (factura: string): Promise<Compra> => {
+    const res = await fetch(`${BASE}/by-factura/${encodeURIComponent(factura)}`);
+    if (!res.ok) throw new Error('No se encontró la factura');
+    return res.json();
+  };
+
   const create = async (data: CompraPayload): Promise<Compra> => {
     const res = await fetch(BASE, {
       method: 'POST',
@@ -76,5 +82,5 @@ export function useCompras() {
     if (!res.ok) throw new Error('Error al eliminar compra');
   };
 
-  return { getAll, getOne, create, update, remove };
+  return { getAll, getOne, getByFactura, create, update, remove };
 }

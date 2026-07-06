@@ -398,6 +398,45 @@ app.get('/api/compras', async (req, res) => {
   }
 });
 
+// GET /api/compras/by-factura/:factura — obtiene una compra por número de factura
+app.get('/api/compras/by-factura/:factura', async (req, res) => {
+  try {
+    const compraRes = await pool.query(
+      `SELECT id, factura, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, proveedor, forma_pago as "formaPago", total, created_at
+       FROM compras
+       WHERE factura = $1 AND deleted_at IS NULL
+       ORDER BY id DESC
+       LIMIT 1`,
+      [req.params.factura]
+    );
+    if (!compraRes.rows.length) {
+      return res.status(404).json({ error: 'Compra no encontrada' });
+    }
+    const compra = compraRes.rows[0];
+
+    const detallesRes = await pool.query(
+      `SELECT id, cantidad, medida, producto, precio_unitario as "precioUnitario", descuento
+       FROM compras_detalles
+       WHERE compra_id = $1
+       ORDER BY id ASC`,
+      [compra.id]
+    );
+
+    compra.items = detallesRes.rows.map(item => ({
+      ...item,
+      cantidad: parseFloat(item.cantidad),
+      precioUnitario: parseFloat(item.precioUnitario),
+      descuento: parseFloat(item.descuento)
+    }));
+    compra.total = parseFloat(compra.total);
+
+    res.json(compra);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener la compra por factura' });
+  }
+});
+
 // GET /api/compras/:id — obtiene una compra y sus detalles
 app.get('/api/compras/:id', async (req, res) => {
   try {
@@ -2053,7 +2092,7 @@ app.post('/api/ordenes', async (req, res) => {
 
 // PUT /api/ordenes/:id/status — Actualiza el estado de la orden
 app.put('/api/ordenes/:id/status', async (req, res) => {
-  const { estado } = req.body;
+  const { estado, pagoMetodo } = req.body;
   const { id } = req.params;
 
   if (!estado) {
@@ -2061,13 +2100,15 @@ app.put('/api/ordenes/:id/status', async (req, res) => {
   }
 
   try {
-    const { rows } = await pool.query(
-      `UPDATE ordenes
-       SET estado = $1, edited_at = now()
-       WHERE id = $2
-       RETURNING id, estado`,
-      [estado, id]
-    );
+    let query = `UPDATE ordenes SET estado = $1, edited_at = now() WHERE id = $2 RETURNING id, estado`;
+    let params = [estado, id];
+
+    if (pagoMetodo) {
+      query = `UPDATE ordenes SET estado = $1, pago_metodo = $3, edited_at = now() WHERE id = $2 RETURNING id, estado, pago_metodo`;
+      params.push(pagoMetodo);
+    }
+
+    const { rows } = await pool.query(query, params);
 
     if (!rows.length) {
       return res.status(404).json({ error: 'Orden no encontrada' });
