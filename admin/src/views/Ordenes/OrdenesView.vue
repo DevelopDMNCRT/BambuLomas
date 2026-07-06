@@ -219,7 +219,7 @@
                   ${{ orden.total.toFixed(2) }}
                 </span>
                 <button
-                  @click.stop="cambiarEstadoOrden(orden, 'Completada')"
+                  @click.stop="irAPosParaEntregar(orden)"
                   class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1"
                 >
                   <span>Entregar</span>
@@ -402,10 +402,10 @@
           </button>
           <button 
             v-else-if="ordenSeleccionada.estado === 'En entrega'"
-            @click="cambiarEstadoOrden(ordenSeleccionada, 'Completada')"
+            @click="irAPosParaEntregar(ordenSeleccionada)"
             class="flex-1 py-3.5 bg-[#2D5A5A] hover:bg-[#1E3B3B] text-white font-bold rounded-2xl shadow transition-colors"
           >
-            Completar Orden
+            Cobrar en POS
           </button>
         </div>
 
@@ -418,8 +418,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
+import { useRouter } from 'vue-router'
 import { useOrdenes, type Orden } from '@/composables/useOrdenes'
 
+const router = useRouter()
 const { ordenes, loading, startPolling, stopPolling, actualizarEstado } = useOrdenes()
 
 const mostrarModal = ref(false)
@@ -450,6 +452,11 @@ const cambiarEstadoOrden = async (orden: Orden, nuevoEstado: any) => {
       ordenSeleccionada.value.estado = nuevoEstado
     }
   }
+}
+
+const irAPosParaEntregar = (orden: Orden) => {
+  sessionStorage.setItem('pos_orden_online', JSON.stringify(orden))
+  router.push('/pos?ordenOnline=true')
 }
 
 // Iniciar polling al montar y detener al desmontar

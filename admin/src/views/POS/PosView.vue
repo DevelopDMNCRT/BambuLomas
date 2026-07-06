@@ -485,6 +485,7 @@ const { getUser } = useAuth();
 // Mesa vinculada al POS
 const mesaActual = ref<number | null>(null);
 const cxcClientName = ref<string | null>(null);
+const ordenOnlineId = ref<number | null>(null);
 
 const platillos = ref<any[]>([]);
 const loading = ref(true);
@@ -689,12 +690,23 @@ watch(
 onMounted(async () => {
   const mesaQuery = route.query.mesa;
   const cxcQuery = route.query.cxc;
+  const ordenOnlineQuery = route.query.ordenOnline;
   
   if (mesaQuery) {
     mesaActual.value = parseInt(mesaQuery as string, 10);
   }
   if (cxcQuery) {
     cxcClientName.value = cxcQuery as string;
+  }
+  if (ordenOnlineQuery) {
+    try {
+      const data = sessionStorage.getItem('pos_orden_online');
+      if (data) {
+        const ordenObj = JSON.parse(data);
+        ordenOnlineId.value = ordenObj.id;
+        currentOrderNum.value = ordenObj.numeroPedido;
+      }
+    } catch(e){}
   }
   
   await Promise.all([fetchPlatillos(), fetchRecetas(), fetchCxcClientes()]);
@@ -740,6 +752,49 @@ onMounted(async () => {
       cart.value = newCart;
     } catch (e) {
       console.error('Error loading CXC details:', e);
+    }
+  }
+
+  // Load online order if present
+  if (ordenOnlineId.value) {
+    try {
+      const data = sessionStorage.getItem('pos_orden_online');
+      if (data) {
+        const ordenObj = JSON.parse(data);
+        const newCart = [];
+        for (const prod of ordenObj.productos) {
+          const platillo = platillos.value.find((p: any) => p.nombre === prod.nombre) || {
+            id: prod.id || Date.now() + Math.random(),
+            nombre: prod.nombre,
+            precioBase: prod.precio,
+            imagenUrl: prod.imagenUrl || null,
+            variables: []
+          };
+          
+          let variablesSeleccionadas = prod.selectedVariants || [];
+          if (!variablesSeleccionadas.length && prod.variantsLabel) {
+             variablesSeleccionadas = prod.variantsLabel.split(' · ').map((ext: string) => ({
+               grupo: '', opcion: ext, precioExtra: 0
+             }));
+          }
+          
+          newCart.push({
+            platillo,
+            cantidad: prod.cantidad || 1,
+            variablesSeleccionadas
+          });
+        }
+        cart.value = newCart;
+        
+        // Select payment method
+        const matchedMethod = paymentMethods.find(m => m.label.toLowerCase() === ordenObj.pagoMetodo?.toLowerCase());
+        if (matchedMethod) {
+           paymentData.value.method = matchedMethod.value;
+        }
+        paymentData.value.clientName = ordenObj.clienteNombre;
+      }
+    } catch(e) {
+      console.error('Error loading online order:', e);
     }
   }
 });
@@ -979,7 +1034,18 @@ const processPayment = async () => {
   const method = paymentMethods.find(m => m.value === paymentData.value.method);
   
   try {
-    if (cxcClientName.value) {
+    if (ordenOnlineId.value) {
+      // Update existing order status to Completada
+      await fetch(`${API_URL}/api/ordenes/${ordenOnlineId.value}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          estado: 'Completada',
+          pagoMetodo: method?.label || 'Efectivo'
+        })
+      });
+      sessionStorage.removeItem('pos_orden_online');
+    } else if (cxcClientName.value) {
       // Liquidar deuda en backend
       await payCxcDebt(cxcClientName.value, method?.label || 'Efectivo');
     } else {
@@ -1035,6 +1101,7 @@ const closeConfirmationModal = () => {
   cart.value = [];
   discount.value = { amount: 0, reason: '' };
   clienteEscaneado.value = null; // Limpiar el cliente
+  ordenOnlineId.value = null;
   currentOrderNum.value++;
   
   if (cxcClientName.value) {
