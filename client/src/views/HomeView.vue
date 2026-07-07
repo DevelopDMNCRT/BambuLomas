@@ -2,7 +2,7 @@
   <div class="min-h-screen pb-24 mx-auto max-w-7xl bg-[#F8F9FA] md:bg-white md:shadow-sm dark:bg-gray-900 md:dark:bg-gray-900 transition-colors">
     <Header />
     <main class="px-5 md:px-10 lg:px-16 pt-4 md:pt-8 space-y-8">
-      <HeroBanner :lowestPrice="lowestPrice" />
+      <HeroBanner :lowestPrice="lattePrice" />
       <div>
         <h2 class="text-[28px] font-black tracking-tight text-gray-900 dark:text-white mb-5 transition-colors">Nuestro Menú</h2>
         <CategoryScroll :categories="categories" :activeCategory="activeCategory" @select="activeCategory = $event" />
@@ -42,7 +42,7 @@ const activeCategory = ref('Todos')
 onMounted(async () => {
   try {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-    const res = await fetch(`${apiUrl}/api/platillos`)
+    const res = await fetch(`${apiUrl}/api/platillos?publicos=true`)
     if (res.ok) {
       const data = await res.json()
       products.value = data
@@ -59,16 +59,18 @@ const filteredProducts = computed(() => {
   return products.value.filter(p => p.categoria === activeCategory.value)
 })
 
-const lowestPrice = computed(() => {
+const lattePrice = computed(() => {
   if (products.value.length === 0) return 48
-  const coffeeProducts = products.value.filter(p => {
-    const cat = (p.categoria || '').toLowerCase()
-    const name = (p.nombre || '').toLowerCase()
-    return cat.includes('café') || cat.includes('cafe') || cat.includes('caliente') ||
-           name.includes('café') || name.includes('cafe') || name.includes('latte') || 
-           name.includes('espresso') || name.includes('americano') || name.includes('capuchino')
-  })
-  const targetProducts = coffeeProducts.length > 0 ? coffeeProducts : products.value
-  return Math.min(...targetProducts.map(p => Number(p.precioBase)))
+  // Buscar específicamente el platillo "Latte"
+  const latte = products.value.find(p =>
+    (p.nombre || '').toLowerCase().trim() === 'latte'
+  )
+  if (latte && latte.precioBase > 0) return Number(latte.precioBase)
+  // Fallback: cualquier producto que contenga "latte" en el nombre
+  const latteAlt = products.value.find(p =>
+    (p.nombre || '').toLowerCase().includes('latte')
+  )
+  if (latteAlt && latteAlt.precioBase > 0) return Number(latteAlt.precioBase)
+  return 48
 })
 </script>

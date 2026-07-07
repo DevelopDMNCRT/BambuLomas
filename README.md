@@ -67,10 +67,34 @@ npm run dev
 
 ## 📝 Últimos Cambios y Contexto Actual (Julio 2026)
 
-- **Integración Kanban -> POS:** Se rediseñó el flujo de las órdenes online. Ahora, al dar clic en "Cobrar en POS" desde la columna *En entrega* del tablero Kanban, el sistema pasa la orden directamente al Punto de Venta (POS). El POS precarga el cliente, el método de pago original y mapea perfectamente los productos y sus variantes seleccionadas. Al pagar, se actualiza la orden a `Completada` sin generar duplicados en la base de datos.
+- **Integración Kanban → POS:** Se rediseñó el flujo de las órdenes online. Ahora, al dar clic en "Cobrar en POS" desde la columna *En entrega* del tablero Kanban, el sistema pasa la orden directamente al Punto de Venta (POS). El POS precarga el cliente, el método de pago original y mapea perfectamente los productos y sus variantes seleccionadas. Al pagar, se actualiza la orden a `Completada` sin generar duplicados en la base de datos.
 - **Historial de Inventario y Compras:** Se corrigió el enlace entre el Historial de Inventarios y el detalle de la compra. Ahora, al dar clic sobre el número de factura en el historial, el frontend (`ComprasForm.vue`) consulta el nuevo endpoint `GET /api/compras/by-factura/:factura` para mostrar el desglose exacto de la compra de la cual provino ese lote de inventario.
 - **Cuentas por Cobrar (CXC):** El POS ahora maneja un flujo especializado para pagar cuentas por cobrar, validando a los clientes desde la base de datos y liquidando deudas de manera controlada directamente desde la caja.
 - **Limpieza de Sesiones Locales:** Se resolvieron problemas de puertos duplicados y "stale instances" (procesos zombi) de Node que causaban conflictos de hot-reload y problemas de login por caché vieja en la base de datos de Neon.
+
+### 🗓 07 de Julio 2026
+
+- **Nuevo Dashboard de Estadísticas (`Ecommerce.vue`):** Se implementó desde cero la sección de estadísticas del panel de administración. Características:
+  - Filtro por **Día** (estado inicial: hoy) o por **Mes** mediante botones de modo.
+  - **Card de Ingresos:** suma total de ventas del período seleccionado.
+  - **Card de Compras:** total gastado en compras del período.
+  - **Card de Gastos:** total de gastos operativos del período.
+  - **Card de Cortesías:** total en cortesías/descuentos del período.
+  - **Card de Balance General:** calculado como `Ingresos - Compras - Gastos` (CXC y cortesías no se consideran ya que no representan flujo de caja real).
+  - **Card de CXC (Cuentas por Cobrar):** muestra siempre el acumulado histórico global, sin importar el filtro de fecha activo.
+  - **Tabla Top 5 Platillos más vendidos** del período seleccionado.
+  - **Tabla Top 5 Clientes con más deuda CXC** acumulada (para identificar quién debe más).
+  - Nuevo endpoint `GET /api/estadisticas/resumen` en el backend que centraliza todos los cálculos con una sola llamada, soportando parámetros `?modo=dia|mes` y `?fecha=YYYY-MM-DD|YYYY-MM`.
+
+- **Corrección del Selector de Fechas en Estadísticas:** Los selectores de Día y Mes ahora conviven visibles simultáneamente. Al hacer clic directamente en cualquiera de ellos se activa automáticamente su modo, sin necesidad de usar los botones de cambio. Se integró `monthSelectPlugin` de Flatpickr para mostrar una cuadrícula real de meses/año en lugar del calendario de días. Se eliminó la restricción `maxDate` que bloqueaba la selección de meses anteriores.
+
+- **Corrección de Bug Crítico — Inventario Dinámico (POS):** Se identificó y resolvió un bug que impedía que el inventario se descontara al realizar ventas desde el POS.
+  - **Causa raíz:** El POS enviaba el nombre del platillo vendido en el campo `producto`, pero el servidor solo buscaba `prod.nombre || prod.name`, causando que la búsqueda de la receta siempre fallara silenciosamente.
+  - **Corrección (`server/index.js`):** La resolución del nombre ahora es `prod.nombre || prod.name || prod.producto`, cubriendo el POS, el cliente web y cualquier otra fuente.
+  - **Resultado:** Al vender cualquier platillo de la carta que tenga una receta vinculada, sus ingredientes se descuentan automáticamente del stock de inventario en la tabla `inventario_salidas`.
+
+- **Corrección de Estilos del PDF de Inventario:** Se ajustó el gradiente de fondo del encabezado en el reporte PDF del inventario (`InventarioView.vue`). El gradiente anterior era demasiado oscuro y uniforme, haciendo que el logo blanco se confundiera con el fondo verde. Se cambió a un gradiente con dirección `to top` que genera más contraste en la zona del logo.
+
 
 ---
 

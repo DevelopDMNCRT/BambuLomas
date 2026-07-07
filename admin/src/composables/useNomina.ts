@@ -14,6 +14,15 @@ export interface NominaRegistro {
   horaExactaSalida: string | null;
 }
 
+export interface NominaSemanaRegistro {
+  id: number;
+  usuario_id: number;
+  rol: string;
+  hora_entrada: string;
+  hora_salida: string;
+  fecha: string; // YYYY-MM-DD
+}
+
 export interface DiaSemana {
   dia_semana: number; // 0=Lun, 1=Mar, ..., 6=Dom
   tipo: 'laboral' | 'descanso';
@@ -41,6 +50,47 @@ export function useNomina() {
       console.error(error.value);
     } finally {
       loading.value = false;
+    }
+  };
+
+  /**
+   * Obtiene los registros de nómina de un usuario para una semana específica.
+   * Usado para pre-llenar el modal de edición.
+   */
+  const getNominaSemana = async (usuarioId: number, semanaInicio: string): Promise<NominaSemanaRegistro[]> => {
+    try {
+      const res = await fetch(`/api/nomina/semana?usuario_id=${usuarioId}&semana_inicio=${semanaInicio}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  };
+
+  /**
+   * Actualiza (upsert) los registros de nómina de un usuario para una semana.
+   * Si el registro ya existe, lo actualiza; si no, lo crea.
+   */
+  const updateNominaSemana = async (
+    usuarioId: number,
+    rol: string,
+    registros: { fecha: string; hora_entrada: string; hora_salida: string }[]
+  ) => {
+    try {
+      const res = await fetch('/api/nomina/semana', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: usuarioId, rol, registros }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al actualizar la nómina');
+      }
+      const data = await res.json();
+      return { success: true, data };
+    } catch (err: any) {
+      console.error(err);
+      return { success: false, error: err.message };
     }
   };
 
@@ -111,6 +161,8 @@ export function useNomina() {
     loading,
     error,
     fetchNominas,
+    getNominaSemana,
+    updateNominaSemana,
     createNomina,
     getHorarioSemanal,
     saveHorarioSemanal,

@@ -84,6 +84,49 @@ const createHorariosSemanalesTable = async () => {
 };
 createHorariosSemanalesTable();
 
+// Migración: agregar UNIQUE constraint a nomina(usuario_id, fecha) para soportar upserts en edición
+const migrateNominaConstraint = async () => {
+  try {
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'nomina_usuario_fecha_unique'
+        ) THEN
+          ALTER TABLE nomina ADD CONSTRAINT nomina_usuario_fecha_unique UNIQUE (usuario_id, fecha);
+        END IF;
+      END $$;
+    `);
+    console.log("✅ Constraint UNIQUE en nomina(usuario_id, fecha) verificado.");
+  } catch (err) {
+    console.error("❌ Error en migración de constraint nomina:", err);
+  }
+};
+migrateNominaConstraint();
+
+// Crear tabla inventario_salidas si no existe
+const createInventarioSalidasTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS inventario_salidas (
+        id          INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        orden_id    INTEGER REFERENCES ordenes(id) ON DELETE SET NULL,
+        producto    VARCHAR(255) NOT NULL,
+        product_id  INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        cantidad    NUMERIC(12,4) NOT NULL,
+        medida      VARCHAR(50),
+        motivo      VARCHAR(100) DEFAULT 'venta',
+        created_at  TIMESTAMP DEFAULT now()
+      );
+    `);
+    console.log("\u2705 Tabla 'inventario_salidas' verificada en la base de datos.");
+  } catch (err) {
+    console.error("\u274c Error al crear la tabla 'inventario_salidas':", err);
+  }
+};
+createInventarioSalidasTable();
+
 // ── UPLOAD DE IMAGENES ────────────────────────────────────
 
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -610,9 +653,7 @@ app.delete('/api/compras/:id', async (req, res) => {
 
 // ── INVENTARIO ────────────────────────────────────────────
 
-// GET /api/inventario — lista productos maestros con su stock consolidado
-// Si el producto tiene un product_id enlazado agrupa por ese ID (maestro),
-// de lo contrario cae back al nombre literal (filas no migradas).
+// GET /api/inventario — lista productos maestros con su stock consolidado (entradas - salidas)
 app.get('/api/inventario', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -621,7 +662,7 @@ app.get('/api/inventario', async (req, res) => {
          SELECT
            p.id            AS master_id,
            p.name          AS nombre,
-           SUM(cd.cantidad) AS total_stock,
+           SUM(cd.cantidad) AS total_entradas,
            p.unit          AS medida,
            MAX(c.fecha)    AS ultima_compra
          FROM compras_detalles cd
@@ -635,7 +676,7 @@ app.get('/api/inventario', async (req, res) => {
          SELECT
            NULL::INTEGER    AS master_id,
            cd.producto      AS nombre,
-           SUM(cd.cantidad) AS total_stock,
+           SUM(cd.cantidad) AS total_entradas,
            cd.medida        AS medida,
            MAX(c.fecha)     AS ultima_compra
          FROM compras_detalles cd
@@ -647,11 +688,28 @@ app.get('/api/inventario', async (req, res) => {
          SELECT * FROM master_stock
          UNION ALL
          SELECT * FROM legacy_stock
+       ),
+       -- Salidas por ventas (descuentos de inventario)
+       salidas_master AS (
+         SELECT product_id AS master_id, SUM(cantidad) AS total_salidas
+         FROM inventario_salidas
+         WHERE product_id IS NOT NULL
+         GROUP BY product_id
+       ),
+       salidas_legacy AS (
+         SELECT producto AS nombre, SUM(cantidad) AS total_salidas
+         FROM inventario_salidas
+         WHERE product_id IS NULL
+         GROUP BY producto
        )
        SELECT
          combined.master_id,
          combined.nombre,
-         combined.total_stock AS "stockVal",
+         combined.total_entradas
+           - COALESCE(salidas_master.total_salidas, 0)
+           - COALESCE(salidas_legacy.total_salidas, 0) AS "stockVal",
+         combined.total_entradas AS "totalEntradas",
+         COALESCE(salidas_master.total_salidas, salidas_legacy.total_salidas, 0) AS "totalSalidas",
          combined.medida,
          TO_CHAR(combined.ultima_compra, 'YYYY-MM-DD') AS "ultimaCompra",
          (
@@ -668,27 +726,32 @@ app.get('/api/inventario', async (req, res) => {
            LIMIT 1
          ) AS "costoReal"
        FROM combined
+       LEFT JOIN salidas_master ON combined.master_id IS NOT NULL AND salidas_master.master_id = combined.master_id
+       LEFT JOIN salidas_legacy ON combined.master_id IS NULL AND salidas_legacy.nombre = combined.nombre
        ORDER BY combined.nombre ASC`
     );
 
     const formatted = rows.map((row, idx) => {
       const seq = String(idx + 1).padStart(4, '0');
       const id = row.master_id ? `MP${String(row.master_id).padStart(5, '0')}` : `INV260${seq}`;
-      const stockVal = parseFloat(row.stockVal) || 0;
+      const stockVal = Math.max(0, parseFloat(row.stockVal) || 0);
       const costoReal = parseFloat(row.costoReal) || 0;
-      const minimosVal = Math.max(1, Math.ceil(stockVal * 0.25));
+      const minimosVal = Math.max(1, Math.ceil((parseFloat(row.totalEntradas) || 0) * 0.25));
 
       return {
         id,
         nombre: row.nombre,
         stock: `${stockVal} ${row.medida}`,
         stockVal,
+        totalEntradas: parseFloat(row.totalEntradas) || 0,
+        totalSalidas: parseFloat(row.totalSalidas) || 0,
         ultimaCompra: row.ultimaCompra || '',
         minimos: `${minimosVal} ${row.medida}`,
         minimosVal,
         costoReal,
         medida: row.medida,
-        esMaestro: row.master_id !== null
+        esMaestro: row.master_id !== null,
+        stockBajo: stockVal <= minimosVal
       };
     });
 
@@ -1738,6 +1801,82 @@ app.post('/api/nomina', async (req, res) => {
   }
 });
 
+// GET /api/nomina/semana — obtiene todos los registros de nomina de un usuario en una semana
+// Query params: usuario_id, semana_inicio (YYYY-MM-DD, el lunes de la semana)
+app.get('/api/nomina/semana', async (req, res) => {
+  const { usuario_id, semana_inicio } = req.query;
+  if (!usuario_id || !semana_inicio) {
+    return res.status(400).json({ error: 'Se requieren usuario_id y semana_inicio' });
+  }
+  try {
+    // Calcular el rango lunes→domingo
+    const base = new Date(semana_inicio + 'T12:00:00');
+    const dayOfWeek = base.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(base);
+    monday.setDate(base.getDate() + diffToMonday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const toStr = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    const { rows } = await pool.query(
+      `SELECT id, usuario_id, rol,
+         TO_CHAR(hora_entrada, 'HH24:MI') as hora_entrada,
+         TO_CHAR(hora_salida, 'HH24:MI') as hora_salida,
+         TO_CHAR(fecha, 'YYYY-MM-DD') as fecha
+       FROM nomina
+       WHERE usuario_id = $1
+         AND fecha BETWEEN $2 AND $3
+       ORDER BY fecha ASC`,
+      [usuario_id, toStr(monday), toStr(sunday)]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener nomina de la semana' });
+  }
+});
+
+// PUT /api/nomina/semana — upsert (actualiza o crea) los registros de nomina de un usuario para una semana
+// Body: { usuario_id, rol, registros: [{ fecha, hora_entrada, hora_salida }] }
+app.put('/api/nomina/semana', async (req, res) => {
+  const { usuario_id, rol, registros } = req.body;
+  if (!usuario_id || !Array.isArray(registros) || registros.length === 0) {
+    return res.status(400).json({ error: 'Se requieren usuario_id y registros' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const resultado = [];
+    for (const r of registros) {
+      if (!r.fecha || !r.hora_entrada || !r.hora_salida) continue;
+      // UPSERT: si ya existe para ese usuario+fecha, actualiza; si no, inserta
+      const { rows } = await client.query(
+        `INSERT INTO nomina (usuario_id, rol, hora_entrada, hora_salida, fecha)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (usuario_id, fecha)
+         DO UPDATE SET hora_entrada = $3, hora_salida = $4, rol = $2
+         RETURNING id, usuario_id, rol,
+           TO_CHAR(hora_entrada, 'HH24:MI') as hora_entrada,
+           TO_CHAR(hora_salida, 'HH24:MI') as hora_salida,
+           TO_CHAR(fecha, 'YYYY-MM-DD') as fecha`,
+        [usuario_id, rol || 'N/A', r.hora_entrada, r.hora_salida, r.fecha]
+      );
+      resultado.push(rows[0]);
+    }
+    await client.query('COMMIT');
+    res.json(resultado);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Error al actualizar nomina de la semana' });
+  } finally {
+    client.release();
+  }
+});
+
 // ── HORARIOS SEMANALES ────────────────────────────────────
 
 // GET /api/horarios-semanales/:usuario_id
@@ -1816,8 +1955,10 @@ app.post('/api/usuarios/:id/reset-device', async (req, res) => {
 
 // ── CARTA (PLATILLOS) ─────────────────────────────────────
 
-// GET /api/platillos — Lista todos los platillos de la carta
+// GET /api/platillos — Lista los platillos de la carta
+// Si ?publicos=true, solo devuelve los que NO son privados (para el cliente web)
 app.get('/api/platillos', async (req, res) => {
+  const soloPublicos = req.query.publicos === 'true';
   try {
     const { rows } = await pool.query(`
       SELECT 
@@ -1827,6 +1968,7 @@ app.get('/api/platillos', async (req, res) => {
         p.variables, p.created_at
       FROM platillos p
       WHERE p.deleted_at IS NULL
+        ${soloPublicos ? 'AND p.privado = false' : ''}
       ORDER BY p.categoria ASC, p.nombre ASC
     `);
     res.json(rows);
@@ -2078,6 +2220,59 @@ app.post('/api/ordenes', async (req, res) => {
         }
       }
     }
+
+    // ── Lógica de descuento de inventario ───────────────────────────────
+    // Por cada producto vendido, buscar su receta y descontar los ingredientes
+    for (const prod of productos) {
+      try {
+        // El POS envía el nombre como "producto"; el cliente web usa "nombre" o "name"
+        const nombrePlatillo = prod.nombre || prod.name || prod.producto;
+        // Buscar el platillo por nombre para obtener su receta_base_id
+        const platilloRes = await client.query(
+          `SELECT id, receta_base_id FROM platillos WHERE nombre = $1 AND deleted_at IS NULL LIMIT 1`,
+          [nombrePlatillo]
+        );
+
+        if (!platilloRes.rows.length || !platilloRes.rows[0].receta_base_id) {
+          console.log(`[Inventario] Platillo "${nombrePlatillo}" sin receta vinculada, se omite descuento.`);
+          continue;
+        }
+
+        const recetaId = platilloRes.rows[0].receta_base_id;
+        const cantidad = Number(prod.cantidad) || 1;
+
+        // Obtener los ingredientes base de la receta (sin variante específica)
+        const ingredientesRes = await client.query(
+          `SELECT rd.producto, rd.cantidad, rd.medida,
+                  p.id AS product_id
+           FROM recetas_detalles rd
+           LEFT JOIN products p ON p.name = rd.producto AND p.deleted_at IS NULL
+           WHERE rd.receta_id = $1`,
+          [recetaId]
+        );
+
+        // Insertar una salida por cada ingrediente × cantidad vendida
+        for (const ing of ingredientesRes.rows) {
+          await client.query(
+            `INSERT INTO inventario_salidas (orden_id, producto, product_id, cantidad, medida, motivo)
+             VALUES ($1, $2, $3, $4, $5, 'venta')`,
+            [
+              rows[0].id,
+              ing.producto,
+              ing.product_id || null,
+              parseFloat(ing.cantidad) * cantidad,
+              ing.medida
+            ]
+          );
+        }
+
+        console.log(`[Inventario] Descontados ${ingredientesRes.rows.length} insumos para "${nombrePlatillo}" (x${cantidad}).`);
+      } catch (invErr) {
+        // No romper la transacción si hay error en inventario — solo loguear
+        console.error(`[Inventario] Error al descontar insumos para "${nombrePlatillo}":`, invErr.message);
+      }
+    }
+    // ────────────────────────────────────────────────────────
 
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
@@ -2575,6 +2770,182 @@ app.post('/api/recompensa/canjear', async (req, res) => {
   } catch (err) {
     console.error('Error al canjear recompensa:', err);
     res.status(500).json({ error: 'Error interno al procesar el canje.' });
+  }
+});
+
+// ── ESTADÍSTICAS DASHBOARD ────────────────────────────────────────────────────
+
+/**
+ * GET /api/estadisticas/resumen
+ * Query params:
+ *   modo = 'dia' | 'mes'
+ *   fecha = 'YYYY-MM-DD'   (cuando modo=dia)
+ *   mes   = 'YYYY-MM'      (cuando modo=mes)
+ *
+ * Devuelve un objeto con:
+ *   ingresos, cantidadCompras, gastos, cxcTotal (siempre global),
+ *   cortesias, balance, topPlatillos
+ */
+app.get('/api/estadisticas/resumen', async (req, res) => {
+  try {
+    const { modo = 'dia', fecha, mes } = req.query;
+
+    // ── Construir rango de fechas ──────────────────────────────────────────
+    let startDate, endDate;
+    if (modo === 'mes' && mes) {
+      // mes = 'YYYY-MM'  →  primer y último día del mes
+      startDate = `${mes}-01`;
+      // Calculamos el último día del mes
+      const [year, month] = mes.split('-').map(Number);
+      const lastDay = new Date(year, month, 0).getDate();
+      endDate = `${mes}-${String(lastDay).padStart(2, '0')}`;
+    } else {
+      // Modo día — si no viene fecha, usar hoy
+      if (fecha) {
+        startDate = fecha;
+      } else {
+        const today = new Date();
+        startDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+          .toISOString().split('T')[0];
+      }
+      endDate = startDate;
+    }
+
+    // ── Ingresos (ordenes reales: excluye CXC y cortesías) ────────────────
+    const { rows: ingresosRows } = await pool.query(
+      `SELECT COALESCE(SUM(total), 0) as total, COUNT(id) as cantidad
+       FROM ordenes
+       WHERE created_at >= $1::date
+         AND created_at < ($2::date + interval '1 day')
+         AND estado != 'Cancelada'
+         AND LOWER(pago_metodo) NOT IN ('cxc', 'cortesia', 'cortesía')`,
+      [startDate, endDate]
+    );
+    const ingresos = parseFloat(ingresosRows[0].total);
+    const cantidadVentas = parseInt(ingresosRows[0].cantidad, 10);
+
+    // ── Compras ───────────────────────────────────────────────────────────
+    const { rows: comprasRows } = await pool.query(
+      `SELECT COALESCE(SUM(total), 0) as total, COUNT(id) as cantidad
+       FROM compras
+       WHERE fecha >= $1::date
+         AND fecha <= $2::date
+         AND deleted_at IS NULL`,
+      [startDate, endDate]
+    );
+    const totalCompras = parseFloat(comprasRows[0].total);
+    const cantidadCompras = parseInt(comprasRows[0].cantidad, 10);
+
+    // ── Gastos ────────────────────────────────────────────────────────────
+    const { rows: gastosRows } = await pool.query(
+      `SELECT COALESCE(SUM(cantidad), 0) as total, COUNT(id) as cantidad
+       FROM gastos
+       WHERE fecha >= $1::date
+         AND fecha <= $2::date
+         AND deleted_at IS NULL`,
+      [startDate, endDate]
+    );
+    const gastos = parseFloat(gastosRows[0].total);
+    const cantidadGastos = parseInt(gastosRows[0].cantidad, 10);
+
+    // ── CXC Total (siempre acumulado global, sin filtro de fecha) ─────────
+    const { rows: cxcRows } = await pool.query(
+      `SELECT COALESCE(SUM(total), 0) as total
+       FROM ordenes
+       WHERE LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'`
+    );
+    const cxcTotal = parseFloat(cxcRows[0].total);
+
+    // ── Cortesías (filtrado por período) ──────────────────────────────────
+    const { rows: cortesiasRows } = await pool.query(
+      `SELECT COALESCE(SUM(total), 0) as total, COUNT(id) as cantidad
+       FROM ordenes
+       WHERE created_at >= $1::date
+         AND created_at < ($2::date + interval '1 day')
+         AND estado != 'Cancelada'
+         AND LOWER(pago_metodo) IN ('cortesia', 'cortesía')`,
+      [startDate, endDate]
+    );
+    const cortesias = parseFloat(cortesiasRows[0].total);
+    const cantidadCortesias = parseInt(cortesiasRows[0].cantidad, 10);
+
+    // ── Balance = Ingresos − Compras − Gastos (sin CXC ni cortesías) ─────
+    const balance = ingresos - totalCompras - gastos;
+
+    // ── Top 5 platillos más vendidos en el período ────────────────────────
+    // Los productos se guardan como JSONB en la columna `productos` de ordenes.
+    // Desempacamos el array y contamos por nombre de producto.
+    const { rows: platillosRows } = await pool.query(
+      `SELECT
+         TRIM(item->>'producto') as nombre,
+         SUM((item->>'cantidad')::numeric) as total_vendido
+       FROM ordenes,
+            jsonb_array_elements(
+              CASE
+                WHEN jsonb_typeof(productos::jsonb) = 'array' THEN productos::jsonb
+                ELSE '[]'::jsonb
+              END
+            ) AS item
+       WHERE created_at >= $1::date
+         AND created_at < ($2::date + interval '1 day')
+         AND estado != 'Cancelada'
+         AND item->>'producto' IS NOT NULL
+         AND TRIM(item->>'producto') != ''
+       GROUP BY TRIM(item->>'producto')
+       ORDER BY total_vendido DESC
+       LIMIT 5`,
+      [startDate, endDate]
+    );
+    const topPlatillos = platillosRows.map(r => ({
+      nombre: r.nombre,
+      totalVendido: parseFloat(r.total_vendido)
+    }));
+
+    res.json({
+      periodo: { startDate, endDate, modo },
+      ingresos,
+      cantidadVentas,
+      totalCompras,
+      cantidadCompras,
+      gastos,
+      cantidadGastos,
+      cxcTotal,
+      cortesias,
+      cantidadCortesias,
+      balance,
+      topPlatillos,
+    });
+  } catch (err) {
+    console.error('Error en /api/estadisticas/resumen:', err);
+    res.status(500).json({ error: 'Error al obtener el resumen de estadísticas' });
+  }
+});
+
+/**
+ * GET /api/estadisticas/top-cxc
+ * Devuelve los top 5 clientes con más deuda CXC acumulada (siempre total global).
+ */
+app.get('/api/estadisticas/top-cxc', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT UPPER(TRIM(cliente_nombre)) as nombre,
+              COUNT(id) as ordenes_count,
+              SUM(total) as total_deuda
+       FROM ordenes
+       WHERE LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'
+       GROUP BY UPPER(TRIM(cliente_nombre))
+       ORDER BY total_deuda DESC
+       LIMIT 5`
+    );
+    const result = rows.map(r => ({
+      nombre: r.nombre,
+      ordenesCount: parseInt(r.ordenes_count, 10),
+      totalDeuda: parseFloat(r.total_deuda)
+    }));
+    res.json(result);
+  } catch (err) {
+    console.error('Error en /api/estadisticas/top-cxc:', err);
+    res.status(500).json({ error: 'Error al obtener top CXC' });
   }
 });
 

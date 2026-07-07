@@ -120,7 +120,7 @@
                     <button @click="abrirDetalle(empleado)" class="text-gray-400 hover:text-brand-500 transition-colors px-2" title="Ver Detalles">
                       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                     </button>
-                    <button class="text-gray-400 hover:text-brand-500 transition-colors px-2" title="Editar">
+                    <button @click="abrirEditar(empleado)" class="text-gray-400 hover:text-brand-500 transition-colors px-2" title="Editar">
                       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </button>
                   </div>
@@ -457,7 +457,7 @@ import { useUsuarios, type Usuario } from '@/composables/useUsuarios';
 import TimeDropdown from './TimeDropdown.vue';
 
 // ── Composables ──────────────────────────────────────────
-const { nominas, loading, fetchNominas, createNomina, getHorarioSemanal, saveHorarioSemanal } = useNomina();
+const { nominas, loading, fetchNominas, createNomina, getNominaSemana, updateNominaSemana, getHorarioSemanal, saveHorarioSemanal } = useNomina();
 const { nominas: detalleNominasRaw, fetchNominas: fetchDetalleNominas, loading: detalleLoading } = useNomina();
 const { getAll } = useUsuarios();
 
@@ -476,6 +476,7 @@ const DIAS_SEMANA = [
 const usuarios = ref<Usuario[]>([]);
 const searchQuery = ref('');
 const showModal = ref(false);
+const modoEdicion = ref(false); // true = editar semana existente, false = agregar nueva
 const saving = ref(false);
 const loadingHorario = ref(false);
 
@@ -716,6 +717,21 @@ const agregarNuevo = () => {
 
 const closeModal = () => { showModal.value = false; };
 
+// Abre el modal en modo edición, pre-llenado con el empleado seleccionado
+const abrirEditar = (empleado: any) => {
+  // Precargar usuario y la fecha de la nómina como semana de referencia
+  formData.value = {
+    usuario_id: empleado.usuario_id ?? '',
+    rol: empleado.rol ?? '',
+    semanaInicio: empleado.fecha ?? getTodayString(),
+  };
+  resetDias();
+  bulkSelectedDays.value = [];
+  bulkHoraEntrada.value = '';
+  bulkHoraSalida.value = '';
+  showModal.value = true;
+  // El watch sobre usuario_id cargará el horario semanal guardado automáticamente
+};
 
 const abrirDetalle = (empleado: any) => {
   selectedDetalleUsuario.value = empleado;
@@ -761,7 +777,7 @@ const guardarNuevo = async () => {
 
   saving.value = true;
 
-  // 1. Guardar horario semanal en horarios_semanales
+  // 1. Guardar horario semanal (template) en horarios_semanales
   const diasPayload = diasSemana.value
     .map((d, idx) => ({
       dia_semana: idx,
@@ -773,7 +789,7 @@ const guardarNuevo = async () => {
 
   await saveHorarioSemanal(Number(formData.value.usuario_id), diasPayload);
 
-  // 2. Crear registros en nomina por cada día laboral de la semana seleccionada
+  // 2. Registros a guardar
   const nominaRegistros = laborales.map(d => ({
     usuario_id: Number(formData.value.usuario_id),
     rol: formData.value.rol || 'N/A',
@@ -783,7 +799,18 @@ const guardarNuevo = async () => {
   }));
 
   if (nominaRegistros.length > 0) {
-    const res = await createNomina(nominaRegistros);
+    let res;
+    if (modoEdicion.value) {
+      // Modo edición: UPSERT (actualiza si existe, crea si no)
+      res = await updateNominaSemana(
+        Number(formData.value.usuario_id),
+        formData.value.rol || 'N/A',
+        nominaRegistros.map(r => ({ fecha: r.fecha, hora_entrada: r.hora_entrada, hora_salida: r.hora_salida }))
+      );
+    } else {
+      // Modo creación: INSERT (omite duplicados)
+      res = await createNomina(nominaRegistros);
+    }
     if (!res.success) {
       alert(res.error);
       saving.value = false;
@@ -792,6 +819,7 @@ const guardarNuevo = async () => {
   }
 
   saving.value = false;
+  modoEdicion.value = false;
   closeModal();
   fetchNominas(currentDateString.value);
 };
