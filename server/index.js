@@ -2642,8 +2642,7 @@ app.post('/api/suscriptores', async (req, res) => {
 
     // Send email
     if (correo) {
-      // fire and forget or await
-      sendSubscriberEmail(correo, nombre, id).catch(err => console.error("Error envío:", err));
+      await sendSubscriberEmail(correo, nombre, id).catch(err => console.error("Error envío:", err));
     }
 
     res.status(201).json(rows[0]);

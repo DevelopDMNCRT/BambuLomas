@@ -332,9 +332,20 @@ const openEditModal = (sub: any) => {
 };
 
 const saveSubscriber = async () => {
-  if (newSub.value.numero && newSub.value.numero.length !== 10) {
-    alert("El número de teléfono debe tener exactamente 10 dígitos.");
-    return;
+  if (newSub.value.numero) {
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(newSub.value.numero)) {
+      alert("El número de teléfono debe contener exactamente 10 dígitos numéricos.");
+      return;
+    }
+  }
+
+  if (newSub.value.correo) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newSub.value.correo)) {
+      alert("Por favor, ingresa un formato de correo electrónico válido.");
+      return;
+    }
   }
 
   isSaving.value = true;
