@@ -2428,7 +2428,7 @@ app.post('/api/cxc/pagar', async (req, res) => {
 
     const { rowCount } = await pool.query(
       `UPDATE ordenes
-       SET pago_metodo = $1
+       SET pago_metodo = $1, created_at = CURRENT_TIMESTAMP, edited_at = CURRENT_TIMESTAMP
        WHERE UPPER(cliente_nombre) = UPPER($2) AND LOWER(pago_metodo) = 'cxc' AND estado != 'Cancelada'`,
       [metodoPago, clienteNombre]
     );
