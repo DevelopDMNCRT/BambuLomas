@@ -42,7 +42,7 @@
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Rol</label>
               <select v-model="formData.rol" :disabled="isViewMode" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 disabled:opacity-50 disabled:cursor-not-allowed appearance-none">
                 <option value="Administrador">Administrador</option>
-                <option value="Cajero">Cajero</option>
+                <option value="Operativo">Operativo</option>
                 <option value="Chef">Chef</option>
               </select>
             </div>
@@ -114,7 +114,7 @@ const formData = reactive({
   usuario: '',
   correo: '',
   telefono: '',
-  rol: 'Cajero',
+  rol: 'Operativo',
   password: '',
   confirmPassword: '',
 });

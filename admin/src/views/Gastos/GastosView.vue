@@ -37,13 +37,6 @@
               Mes
             </button>
             <button 
-              @click="filterMode = 'todos'" 
-              :class="filterMode === 'todos' ? 'bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'"
-              class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 select-none"
-            >
-              Sin Desglose
-            </button>
-            <button 
               @click="filterMode = 'dia'" 
               :class="filterMode === 'dia' ? 'bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'"
               class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 select-none"
@@ -101,6 +94,9 @@
                   </div>
                 </th>
                 <th class="px-5 py-3 text-left">
+                  <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Descripción</p>
+                </th>
+                <th class="px-5 py-3 text-left">
                   <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Cantidad</p>
                 </th>
                 <th class="px-5 py-3 text-left">
@@ -116,7 +112,7 @@
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
               <tr v-if="!filteredGastos.length">
-                <td colspan="6" class="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
+                <td colspan="7" class="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
                   No hay gastos que coincidan con la búsqueda.
                 </td>
               </tr>
@@ -128,6 +124,9 @@
                 </td>
                 <td class="px-5 py-4">
                   <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ gasto.aNombreDe }}</p>
+                </td>
+                <td class="px-5 py-4">
+                  <p class="text-gray-500 text-theme-sm dark:text-gray-400 truncate max-w-[200px]" :title="gasto.descripcion">{{ gasto.descripcion || '—' }}</p>
                 </td>
                 <td class="px-5 py-4">
                   <p class="text-gray-800 font-semibold text-theme-sm dark:text-white/90">{{ formatCurrency(gasto.cantidad) }}</p>
@@ -193,7 +192,7 @@ const todayStr = new Date(new Date().getTime() - (new Date().getTimezoneOffset()
 const currentMonthStr = todayStr.substring(0, 7);
 
 const filterDate = ref(todayStr);
-const filterMode = ref<'hoy' | 'mes' | 'todos' | 'dia'>('hoy');
+const filterMode = ref<'hoy' | 'mes' | 'dia'>('hoy');
 const sortName = ref<'none' | 'asc' | 'desc'>('none');
 
 watch(filterDate, (newVal, oldVal) => {
@@ -231,8 +230,6 @@ const filteredGastos = computed(() => {
       matchesDate = g.fecha.startsWith(currentMonthStr);
     } else if (filterMode.value === 'dia') {
       matchesDate = !filterDate.value || g.fecha === filterDate.value;
-    } else if (filterMode.value === 'todos') {
-      matchesDate = true;
     }
 
     return matchesSearch && matchesDate;

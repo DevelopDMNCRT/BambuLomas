@@ -364,7 +364,7 @@ app.post('/api/usuarios', async (req, res) => {
       `INSERT INTO usuarios (nombre, usuario, correo, telefono, rol, contraseña)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, nombre, usuario, correo, telefono, rol, created_at`,
-      [nombre, usuario, correo, telefono || null, rol || 'Cajero', hashedContraseña]
+      [nombre, usuario, correo, telefono || null, rol || 'Operativo', hashedContraseña]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -1099,7 +1099,7 @@ async function getNextFolio() {
 app.get('/api/gastos', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, folio, a_nombre as "aNombreDe", cantidad, forma_pago as "formaPago", TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, created_at
+      `SELECT id, folio, a_nombre as "aNombreDe", cantidad, forma_pago as "formaPago", TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, descripcion, created_at
        FROM gastos
        WHERE deleted_at IS NULL
        ORDER BY fecha DESC, id DESC`
@@ -1115,7 +1115,7 @@ app.get('/api/gastos', async (req, res) => {
 app.get('/api/gastos/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, folio, a_nombre as "aNombreDe", cantidad, forma_pago as "formaPago", TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, created_at
+      `SELECT id, folio, a_nombre as "aNombreDe", cantidad, forma_pago as "formaPago", TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, descripcion, created_at
        FROM gastos 
        WHERE id = $1 AND deleted_at IS NULL`,
       [req.params.id]
@@ -1132,17 +1132,17 @@ app.get('/api/gastos/:id', async (req, res) => {
 
 // POST /api/gastos — crea uno nuevo
 app.post('/api/gastos', async (req, res) => {
-  const { fecha, aNombreDe, formaPago, cantidad } = req.body;
+  const { fecha, aNombreDe, formaPago, cantidad, descripcion } = req.body;
   if (!fecha || !aNombreDe || cantidad === undefined) {
     return res.status(400).json({ error: 'Campos obligatorios: fecha, aNombreDe, cantidad' });
   }
   try {
     const folio = await getNextFolio();
     const { rows } = await pool.query(
-      `INSERT INTO gastos (folio, fecha, a_nombre, forma_pago, cantidad)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, folio, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, a_nombre as "aNombreDe", forma_pago as "formaPago", cantidad, created_at`,
-      [folio, fecha, aNombreDe, formaPago || 'EFE', cantidad]
+      `INSERT INTO gastos (folio, fecha, a_nombre, forma_pago, cantidad, descripcion)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, folio, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, a_nombre as "aNombreDe", forma_pago as "formaPago", cantidad, descripcion, created_at`,
+      [folio, fecha, aNombreDe, formaPago || 'EFE', cantidad, descripcion || null]
     );
     const gasto = rows[0];
     gasto.cantidad = parseFloat(gasto.cantidad);
@@ -1155,14 +1155,14 @@ app.post('/api/gastos', async (req, res) => {
 
 // PUT /api/gastos/:id — actualiza
 app.put('/api/gastos/:id', async (req, res) => {
-  const { fecha, aNombreDe, formaPago, cantidad } = req.body;
+  const { fecha, aNombreDe, formaPago, cantidad, descripcion } = req.body;
   try {
     const { rows } = await pool.query(
       `UPDATE gastos
-       SET fecha=$1, a_nombre=$2, forma_pago=$3, cantidad=$4, edited_at=now()
-       WHERE id=$5 AND deleted_at IS NULL
-       RETURNING id, folio, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, a_nombre as "aNombreDe", forma_pago as "formaPago", cantidad`,
-      [fecha, aNombreDe, formaPago, cantidad, req.params.id]
+       SET fecha=$1, a_nombre=$2, forma_pago=$3, cantidad=$4, descripcion=$5, edited_at=now()
+       WHERE id=$6 AND deleted_at IS NULL
+       RETURNING id, folio, TO_CHAR(fecha, 'YYYY-MM-DD') as fecha, a_nombre as "aNombreDe", forma_pago as "formaPago", cantidad, descripcion`,
+      [fecha, aNombreDe, formaPago, cantidad, descripcion || null, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Gasto no encontrado' });
     const gasto = rows[0];

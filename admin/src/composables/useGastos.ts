@@ -7,6 +7,7 @@ export interface Gasto {
   aNombreDe: string;
   formaPago: string;
   cantidad: number;
+  descripcion?: string;
   created_at?: string;
 }
 
@@ -15,6 +16,7 @@ export interface GastoPayload {
   aNombreDe: string;
   formaPago: string;
   cantidad: number;
+  descripcion?: string;
 }
 
 const BASE = '/api/gastos';

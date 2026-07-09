@@ -95,7 +95,16 @@ npm run dev
 
 - **Corrección de Estilos del PDF de Inventario:** Se ajustó el gradiente de fondo del encabezado en el reporte PDF del inventario (`InventarioView.vue`). El gradiente anterior era demasiado oscuro y uniforme, haciendo que el logo blanco se confundiera con el fondo verde. Se cambió a un gradiente con dirección `to top` que genera más contraste en la zona del logo.
 
+### 🗓 09 de Julio 2026
 
+- **Iconografía de Ludoteca**: Se cambió el icono de la sección **Ludoteca** en el menú rápido de administración por un icono de virrete de graduación (`GraduationCapIcon`).
+- **Título de Pestaña (Estadísticas)**: Se actualizó el título de la ruta de inicio en el router del administrador (`/`) de `'eCommerce Dashboard'` a `'Estadísticas'`, logrando que la pestaña del navegador muestre `"Estadísticas | Bambu Cloud - Admin"`.
+- **Renombramiento de Rol (Cajero ➔ Operativo)**: Se cambió el rol de usuario `'Cajero'` por `'Operativo'` en toda la plataforma (formulario de usuarios, vistas de corte del día, filtros de checador/nómina, endpoint de backend y registros existentes en la base de datos de Neon).
+- **Campo "Descripción" en CRUD de Gastos**:
+  - Se alteró la tabla `gastos` en PostgreSQL agregando la columna `descripcion` (tipo `TEXT`).
+  - Se integró la lectura y persistencia del campo en los endpoints del servidor (`GET`, `POST`, `PUT`) e interfaces TypeScript.
+  - Se implementó un nuevo input para **Descripción** en el formulario de la UI y su respectiva columna con tooltip en la tabla del historial de gastos.
+- **Filtros de Fecha en Gastos**: Se eliminó el filtro "Sin Desglose" en el CRUD de gastos, dejando únicamente los filtros por fecha: **Hoy** (como opción por defecto inicial), **Mes** y **Día** (con calendario).
 ---
 
 ## 📂 Notas Importantes

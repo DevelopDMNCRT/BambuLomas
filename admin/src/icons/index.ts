@@ -54,8 +54,10 @@ import ScissorsIcon from "./ScissorsIcon.vue";
 import PrinterIcon from "./PrinterIcon.vue";
 import HistoryIcon from "./HistoryIcon.vue";
 import UploadIcon from "./UploadIcon.vue";
+import GraduationCapIcon from "./GraduationCapIcon.vue";
 
 export {
+  GraduationCapIcon,
   BellIcon,
   BarChartIcon,
   LayoutDashboardIcon,

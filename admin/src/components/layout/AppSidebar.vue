@@ -210,6 +210,7 @@ import {
   BarChartIcon,
   PageIcon,
   ListIcon,
+  GraduationCapIcon,
   UserGroupIcon,
   FolderIcon,
   CalenderIcon,
@@ -244,7 +245,7 @@ const quickAccessItems = computed(() => {
     { icon: PieChartIcon, name: "Estadísticas", path: "/" },
     { icon: CashIcon, name: "POS", path: "/pos" },
     { icon: ListIcon, name: "Órdenes", path: "/ordenes" },
-    { icon: ListIcon, name: "Ludoteca", path: "/ludoteca" },
+    { icon: GraduationCapIcon, name: "Ludoteca", path: "/ludoteca" },
     { icon: GridIcon, name: "Mesas", path: "/mesas" },
     { icon: ScissorsIcon, name: "Corte", path: "/corte" },
   ];

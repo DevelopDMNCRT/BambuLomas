@@ -5,9 +5,9 @@
       <!-- Top Controls Row -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         
-        <!-- Cajero Select -->
+        <!-- Operativo Select -->
         <div class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm flex flex-col justify-center">
-          <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Cajero</label>
+          <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Operativo</label>
           <div class="relative">
             <select v-model="selectedCajero" class="w-full appearance-none bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer">
               <option value="Todos">Todos</option>
@@ -150,14 +150,14 @@ const loadCorte = async () => {
     
     const cajerosSet = new Set<string>();
     
-    // Fetch all users with role 'cajero' from backend
+    // Fetch all users with role 'operativo' or 'cajero' from backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const userRes = await fetch(`${API_URL}/api/usuarios`);
       if (userRes.ok) {
         const users = await userRes.json();
         users.forEach((u: any) => {
-          if (u.rol && u.rol.toLowerCase() === 'cajero') {
+          if (u.rol && (u.rol.toLowerCase() === 'operativo' || u.rol.toLowerCase() === 'cajero')) {
             cajerosSet.add(u.nombre || u.usuario);
           }
         });

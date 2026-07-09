@@ -72,7 +72,7 @@
                   <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ user.telefono || '—' }}</p>
                 </td>
                 <td class="px-5 py-4">
-                  <Badge :color="user.rol === 'Administrador' ? 'primary' : (user.rol === 'Cajero' ? 'success' : (user.rol === 'Chef' ? 'warning' : 'light'))">
+                  <Badge :color="user.rol === 'Administrador' ? 'primary' : ((user.rol === 'Operativo' || user.rol === 'Cajero') ? 'success' : (user.rol === 'Chef' ? 'warning' : 'light'))">
                     {{ user.rol }}
                   </Badge>
                 </td>

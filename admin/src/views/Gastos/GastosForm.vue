@@ -58,6 +58,11 @@
               <input type="number" v-model.number="formData.cantidad" step="0.01" min="0" :disabled="isViewMode" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent pl-8 pr-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 disabled:opacity-50 disabled:cursor-not-allowed" />
             </div>
           </div>
+
+          <div class="md:col-span-6">
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Descripción</label>
+            <input type="text" v-model="formData.descripcion" :disabled="isViewMode" placeholder="Escribe una descripción" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 disabled:opacity-50 disabled:cursor-not-allowed" />
+          </div>
         </div>
 
         <div class="mt-6 flex justify-end gap-3" v-if="!isViewMode">
@@ -97,7 +102,8 @@ const formData = reactive({
   fecha: new Date().toISOString().split('T')[0],
   aNombreDe: '',
   formaPago: 'EFE',
-  cantidad: 0
+  cantidad: 0,
+  descripcion: ''
 });
 
 onMounted(async () => {
@@ -112,6 +118,7 @@ onMounted(async () => {
         formData.aNombreDe = gasto.aNombreDe;
         formData.formaPago = gasto.formaPago;
         formData.cantidad = gasto.cantidad;
+        formData.descripcion = gasto.descripcion || '';
       } catch (e: any) {
         apiError.value = e.message || 'Error al obtener los detalles del gasto';
       } finally {
@@ -145,7 +152,8 @@ const saveGasto = async () => {
       fecha: formData.fecha,
       aNombreDe: formData.aNombreDe,
       formaPago: formData.formaPago,
-      cantidad: formData.cantidad
+      cantidad: formData.cantidad,
+      descripcion: formData.descripcion
     };
 
     if (isEditMode.value && gastoId.value !== null) {
