@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 import { sendSubscriberEmail, sendRewardEmail } from './mailer.js';
+import { sendSubscriberWhatsApp } from './whatsapp.js';
 
 dotenv.config();
 
@@ -2640,9 +2641,12 @@ app.post('/api/suscriptores', async (req, res) => {
     `;
     const { rows } = await pool.query(insertQuery, [id, nombre, numero, correo]);
 
-    // Send email
+    // Send notifications
+    if (numero) {
+      sendSubscriberWhatsApp(numero, nombre, id).catch(err => console.error("Error envío WhatsApp:", err));
+    }
     if (correo) {
-      await sendSubscriberEmail(correo, nombre, id).catch(err => console.error("Error envío:", err));
+      sendSubscriberEmail(correo, nombre, id).catch(err => console.error("Error envío Email:", err));
     }
 
     res.status(201).json(rows[0]);
